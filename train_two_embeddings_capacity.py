@@ -77,12 +77,12 @@ def safe_sample(group, n, seed):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--model_name', type=str, default='Qwen/Qwen2.5-0.5B')
-    parser.add_argument('--maxiter', type=int, default=500)
+    parser.add_argument('--maxiter', type=int, default=3000)
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--min_words', type=int, default=10)
-    parser.add_argument('--max_words', type=int, default=100)
-    parser.add_argument('--sample_size', type=int, default=50)
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--min_words', type=int, default=5)
+    parser.add_argument('--max_words', type=int, default=200)
+    parser.add_argument('--sample_size', type=int, default=float('inf'))
+    parser.add_argument('--batch_size', type=int, default=1)
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
     result = []
 
-    for batch in text_dataloader:
+    for batch in tqdm(text_dataloader, desc='Processing dataset'):
         tokenized_text = batch['input_ids']
         lengths = batch['lengths']
         attention_mask = batch['attention_mask']
@@ -138,7 +138,11 @@ if __name__ == '__main__':
             loss = torch.nn.functional.cross_entropy(logits, labels.reshape(-1), ignore_index=tokenizer.pad_token_id)
 
             pred = logits.argmax(dim=-1).view(tokenized_text.shape)
+            correct_counter = 0
             for i in range(args.batch_size):
+                if max_accuracy[i] == 1.0:
+                    correct_counter += 1
+                    continue
                 current_pred = pred[i, :lengths[i]]
                 current_labels = labels[i, :lengths[i]]
                 accuracy, seq_accuracy, correct_prefix_length = calculate_metrics(current_labels, current_pred)
@@ -147,7 +151,9 @@ if __name__ == '__main__':
                     max_seq_accuracy[i] = seq_accuracy
                     best_metrics[i] = (accuracy, seq_accuracy, correct_prefix_length)
                     best_vectors[i] = vectors[i].detach().clone()
-            
+            if correct_counter == args.batch_size:
+                break
+
             loss.backward()
             optimizer.step()
         
