@@ -2,7 +2,7 @@ import argparse
 import torch
 import json
 import torch.nn.functional as F
-from datasets import load_from_disk
+from datasets import load_dataset
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.nn.utils.rnn import pad_sequence
@@ -87,7 +87,7 @@ if __name__ == '__main__':
 
     torch.manual_seed(args.seed)
 
-    DATASET_NAME = 'data/dolly15k_local'
+    DATASET_NAME = 'databricks/databricks-dolly-15k'
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     HYPERPARAMS = {
         'lr': 0.01,
@@ -95,7 +95,7 @@ if __name__ == '__main__':
         'betas': (0.9, 0.9)
     }
     
-    dataset = load_from_disk(DATASET_NAME)
+    dataset = load_dataset(DATASET_NAME)
     df = dataset['train'].to_pandas()
     df = df[df['response'].apply(lambda x: len(x.split(' ')) > args.min_words)].reset_index(drop=True)
     df = df.groupby(by='category', group_keys=False).apply(lambda x: safe_sample(x, args.sample_size, args.seed)).reset_index(drop=True)
