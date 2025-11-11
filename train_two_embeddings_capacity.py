@@ -129,8 +129,9 @@ if __name__ == '__main__':
     model.eval()
 
     result = []
-
-    for batch in tqdm(text_dataloader, desc='Processing dataset'):
+    SAVE_EVERY = 25
+    SAVE_PATH = 'data/training_results.json'
+    for idx, batch in enumerate(tqdm(text_dataloader, desc='Processing dataset')):
         tokenized_text = batch['input_ids']
         lengths = batch['lengths']
         attention_mask = batch['attention_mask']
@@ -194,7 +195,12 @@ if __name__ == '__main__':
                 'correct_prefix_len': best_metrics[i][2],
                 'best_vectors': best_vectors[i].cpu().numpy().tolist()
         })
+            
+        # Сохранение результатов
+        if (idx + 1) % SAVE_EVERY == 0:
+            with open(SAVE_PATH, 'w', encoding='utf-8') as f:
+                json.dump(result, f, ensure_ascii=False, indent=4)
     
     # Сохранение результатов
-    with open('data/training_results.json', 'w', encoding='utf-8') as f:
+    with open(SAVE_PATH, 'w', encoding='utf-8') as f:
         json.dump(result, f, ensure_ascii=False, indent=4)

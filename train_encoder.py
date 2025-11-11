@@ -1,4 +1,5 @@
 import json
+import os
 import argparse
 import torch
 import pandas as pd
@@ -110,6 +111,9 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
 
     DATASET_NAME = 'data/training_results.json'
+    SAVE_DIR = 'checkpoints'
+    if not os.path.exists(SAVE_DIR):
+        os.makedirs(SAVE_DIR)
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     HYPERPARAMS = {
         'lr': 0.0005,
@@ -138,10 +142,14 @@ if __name__ == '__main__':
                                 collate_fn=lambda x: collate_fn(x, tokenizer, decoder_tokenizer, DEVICE))
     
     optimizer = torch.optim.AdamW(model.parameters(), lr=HYPERPARAMS['lr'], betas=HYPERPARAMS['betas'], weight_decay=HYPERPARAMS['weight_decay'])
+    best_val_loss = float('inf')
     for i in range(args.num_epochs):
 
         # Прогон эпохи обучения модели
-        train_loss = 0.0    
+        model.train()
+        train_loss = 0.0
+        train_infoNCE_loss = 0.0
+        train_gaussian_loss = 0.0 
         for batch in train_dataloader:
             optimizer.zero_grad()
             
@@ -150,16 +158,28 @@ if __name__ == '__main__':
             lengths = batch['lengths']
             e_target = batch['vectors'][:, 0, :]
             m_target = batch['vectors'][:, 1, :]
-            
+
             e_pred, m_pred, mu_pred, std_pred = model(input_ids, attention_mask)
-            loss = info_nce_loss(e_pred, m_pred, e_target, m_target) + gaussian_loss(lengths, mu_pred, std_pred)
-            train_loss += loss.item()
+            info_loss = info_nce_loss(e_pred, m_pred, e_target, m_target)
+            gauss_loss = gaussian_loss(lengths, mu_pred, std_pred)
+            loss = info_loss + gauss_loss
+
+            train_infoNCE_loss += info_loss.item()
+            train_gaussian_loss += gauss_loss.item()
+            train_loss += loss.item()            
         
             loss.backward()
             optimizer.step()
 
+        train_loss /= len(train_dataloader)
+        train_infoNCE_loss /= len(train_dataloader)
+        train_gaussian_loss /= len(train_dataloader)
+
         # Прогон эпохи оценки модели
+        model.eval()
         val_loss = 0.0
+        val_infoNCE_loss = 0.0
+        val_gaussian_loss = 0.0
         with torch.no_grad():
             for batch in test_dataloader:
                 input_ids = batch['input_ids']
@@ -169,7 +189,27 @@ if __name__ == '__main__':
                 m_target = batch['vectors'][:, 1, :]
 
                 e_pred, m_pred, mu_pred, std_pred = model(input_ids, attention_mask)
-                loss = info_nce_loss(e_pred, m_pred, e_target, m_target) + gaussian_loss(lengths, mu_pred, std_pred)
+                info_loss = info_nce_loss(e_pred, m_pred, e_target, m_target)
+                gauss_loss = gaussian_loss(lengths, mu_pred, std_pred)
+                loss = info_loss + gauss_loss
+
+                val_infoNCE_loss += info_loss.item()
+                val_gaussian_loss += gauss_loss.item()
                 val_loss += loss.item()
-            
-        print(f'Epoch: {i + 1}; Train Loss: {train_loss}; Eval Loss: {val_loss}')
+
+        val_loss /= len(test_dataloader)
+        val_infoNCE_loss /= len(test_dataloader)
+        val_gaussian_loss /= len(test_dataloader)
+
+        # Сохранение лучшей модели
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            save_path = os.path.join(SAVE_DIR, 'best_model.pt')  
+            torch.save(model.state_dict(), save_path)          
+
+        # Логирование лосса    
+        print(f'Epoch: {i + 1}/{args.num_epochs}')
+        print(f'Train Loss: {train_loss}; Eval Loss: {val_loss}')
+        print(f'Train InfoNCE Loss: {train_infoNCE_loss}; Eval InfoNCE Loss: {val_infoNCE_loss}')
+        print(f'Train Gaussian Loss: {train_gaussian_loss}; Eval Gaussian Loss: {val_gaussian_loss}')
+        print()
