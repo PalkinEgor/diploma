@@ -4,6 +4,7 @@ import argparse
 import torch
 import pandas as pd
 import torch.nn.functional as F
+from peft import LoraConfig, get_peft_model, TaskType
 from transformers import AutoTokenizer, AutoModel
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
@@ -58,9 +59,10 @@ class TextDataset(Dataset):
 
 # Подготовка батча перед подачей в модель
 def collate_fn(batch, tokenizer, decoder_tokenizer, device):
+    max_len = tokenizer.model_max_length
     texts = [item[0] for item in batch]
     vectors = [torch.tensor(item[1]) for item in batch]
-    input_ids = [tokenizer(text, add_special_tokens=True, return_tensors='pt')['input_ids'].reshape(-1) for text in texts]
+    input_ids = [tokenizer(text, add_special_tokens=True, return_tensors='pt', truncation=True, max_length=max_len)['input_ids'].reshape(-1) for text in texts]
     input_ids = pad_sequence(input_ids, batch_first=True, padding_value=tokenizer.pad_token_id).to(device)
     attention_mask = (input_ids != tokenizer.pad_token_id).long().to(device)
     vectors = torch.stack(vectors).to(device)
@@ -102,10 +104,11 @@ def gaussian_loss(target, mu, std):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--model_name', type=str, default='FacebookAI/xlm-roberta-base')
-    parser.add_argument('--decoder_model_name', type=str, default='Qwen/Qwen2.5-0.5B')
+    parser.add_argument('--decoder_model_name', type=str, default='EleutherAI/pythia-410m')
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--num_epochs', type=int, default=20)
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--lora', type=bool, default=False)
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -123,12 +126,26 @@ if __name__ == '__main__':
 
     with open(DATASET_NAME, 'r', encoding='utf-8') as f:
         data = pd.DataFrame(json.load(f))
+    data['text'] = data['text'].apply(lambda x: ' '.join(x.split()[:75]))
+    data = data[data['accuracy'] >= 0.85]
     OUTPUT_DIM = len(data['best_vectors'].to_list()[0][0])
     
     # Загрузка модели и токенизаторов
-    model = Model(args.model_name, OUTPUT_DIM).to(DEVICE)
+    model = Model(args.model_name, OUTPUT_DIM, freeze_bert=False).to(DEVICE)
+    if args.lora:
+        lora_config = LoraConfig(
+            task_type=TaskType.FEATURE_EXTRACTION,
+            r=8,
+            lora_alpha=32,
+            target_modules=['key', 'query', 'value'],
+            lora_dropout=0.1,
+            bias='none'
+        )
+        model.bert = get_peft_model(model.bert, lora_config)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     decoder_tokenizer = AutoTokenizer.from_pretrained(args.decoder_model_name)
+    if decoder_tokenizer.pad_token is None:
+        decoder_tokenizer.pad_token = decoder_tokenizer.eos_token
 
     # Формирование Датасетов и Даталоадеров
     X = data['instruction'].to_list()
@@ -205,7 +222,7 @@ if __name__ == '__main__':
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             save_path = os.path.join(SAVE_DIR, 'best_model.pt')  
-            torch.save(model.state_dict(), save_path)          
+            #torch.save(model.state_dict(), save_path)          
 
         # Логирование лосса    
         print(f'Epoch: {i + 1}/{args.num_epochs}')
