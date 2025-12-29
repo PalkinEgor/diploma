@@ -96,6 +96,29 @@ def info_nce_loss(e_pred, m_pred, e_target, m_target, temperature=0.07):
     loss = 0.5 * (e_loss + m_loss)
     return loss
 
+# Реализация Distance-based logistic loss
+def dbll(e_pred, m_pred, e_target, m_target, margin):
+    margin = torch.tensor(margin).to(DEVICE)
+    total_e_loss = torch.tensor(0.0).to(DEVICE)
+    total_m_loss = torch.tensor(0.0).to(DEVICE)
+    
+    for i in range(e_pred.size(0)):
+        target = torch.zeros(e_pred.size(0)).to(DEVICE)
+        target[i] = 1.0
+
+        D_e = torch.sum((e_pred[i] - e_target) ** 2, dim=1)
+        pred_e = (1 + torch.exp(-margin)) / (1 + torch.exp(D_e - margin))
+        total_e_loss += torch.nn.functional.binary_cross_entropy(pred_e, target)
+
+        D_m = torch.sum((m_pred[i] - m_target) ** 2, dim=1)
+        pred_m = (1 + torch.exp(-margin)) / (1 + torch.exp(D_m - margin))
+        total_m_loss += torch.nn.functional.binary_cross_entropy(pred_m, target)
+        
+    total_e_loss /= e_pred.size(0)
+    total_m_loss /= m_pred.size(0)
+
+    return (total_e_loss + total_m_loss) / 2
+
 # Реализация функции потерь для длин ответов
 def gaussian_loss(target, mu, std):
     return (0.5 * (std + ((target - mu) ** 2) / torch.exp(std))).mean()
