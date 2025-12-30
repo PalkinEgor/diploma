@@ -4,6 +4,7 @@ import argparse
 import torch
 import pandas as pd
 import torch.nn.functional as F
+from tqdm import tqdm
 from peft import LoraConfig, get_peft_model, TaskType
 from transformers import AutoTokenizer, AutoModel
 from torch.nn.utils.rnn import pad_sequence
@@ -97,7 +98,7 @@ def info_nce_loss(e_pred, m_pred, e_target, m_target, temperature=0.07):
     return loss
 
 # Реализация Distance-based logistic loss
-def dbll(e_pred, m_pred, e_target, m_target, margin):
+def dbll(e_pred, m_pred, e_target, m_target, margin=1.0):
     margin = torch.tensor(margin).to(DEVICE)
     total_e_loss = torch.tensor(0.0).to(DEVICE)
     total_m_loss = torch.tensor(0.0).to(DEVICE)
@@ -106,18 +107,18 @@ def dbll(e_pred, m_pred, e_target, m_target, margin):
         target = torch.zeros(e_pred.size(0)).to(DEVICE)
         target[i] = 1.0
 
-        D_e = torch.sum((e_pred[i] - e_target) ** 2, dim=1)
+        D_e = torch.sqrt(torch.sum((e_pred[i] - e_target) ** 2, dim=1))
         pred_e = (1 + torch.exp(-margin)) / (1 + torch.exp(D_e - margin))
         total_e_loss += torch.nn.functional.binary_cross_entropy(pred_e, target)
 
-        D_m = torch.sum((m_pred[i] - m_target) ** 2, dim=1)
+        D_m = torch.sqrt(torch.sum((m_pred[i] - m_target) ** 2, dim=1))
         pred_m = (1 + torch.exp(-margin)) / (1 + torch.exp(D_m - margin))
         total_m_loss += torch.nn.functional.binary_cross_entropy(pred_m, target)
         
     total_e_loss /= e_pred.size(0)
     total_m_loss /= m_pred.size(0)
 
-    return (total_e_loss + total_m_loss) / 2
+    return 0.5 * (total_e_loss + total_m_loss)
 
 # Реализация функции потерь для длин ответов
 def gaussian_loss(target, mu, std):
@@ -141,6 +142,7 @@ if __name__ == '__main__':
     if not os.path.exists(SAVE_DIR):
         os.makedirs(SAVE_DIR)
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f'Device: {DEVICE}')
     HYPERPARAMS = {
         'lr': 0.0005,
         'weight_decay': 0.01,
@@ -149,6 +151,7 @@ if __name__ == '__main__':
 
     with open(DATASET_NAME, 'r', encoding='utf-8') as f:
         data = pd.DataFrame(json.load(f))
+    print('load data')
     data['text'] = data['text'].apply(lambda x: ' '.join(x.split()[:75]))
     data = data[data['accuracy'] >= 0.85]
     OUTPUT_DIM = len(data['best_vectors'].to_list()[0][0])
@@ -165,6 +168,7 @@ if __name__ == '__main__':
             bias='none'
         )
         model.bert = get_peft_model(model.bert, lora_config)
+    print('load model')
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     decoder_tokenizer = AutoTokenizer.from_pretrained(args.decoder_model_name)
     if decoder_tokenizer.pad_token is None:
@@ -200,7 +204,7 @@ if __name__ == '__main__':
             m_target = batch['vectors'][:, 1, :]
 
             e_pred, m_pred, mu_pred, std_pred = model(input_ids, attention_mask)
-            info_loss = info_nce_loss(e_pred, m_pred, e_target, m_target)
+            info_loss = dbll(e_pred, m_pred, e_target, m_target)
             gauss_loss = gaussian_loss(lengths, mu_pred, std_pred)
             loss = info_loss + gauss_loss
 
@@ -229,7 +233,7 @@ if __name__ == '__main__':
                 m_target = batch['vectors'][:, 1, :]
 
                 e_pred, m_pred, mu_pred, std_pred = model(input_ids, attention_mask)
-                info_loss = info_nce_loss(e_pred, m_pred, e_target, m_target)
+                info_loss = dbll(e_pred, m_pred, e_target, m_target)
                 gauss_loss = gaussian_loss(lengths, mu_pred, std_pred)
                 loss = info_loss + gauss_loss
 
@@ -250,6 +254,6 @@ if __name__ == '__main__':
         # Логирование лосса    
         print(f'Epoch: {i + 1}/{args.num_epochs}')
         print(f'Train Loss: {train_loss}; Eval Loss: {val_loss}')
-        print(f'Train InfoNCE Loss: {train_infoNCE_loss}; Eval InfoNCE Loss: {val_infoNCE_loss}')
+        print(f'Train DBL Loss: {train_infoNCE_loss}; Eval DBL Loss: {val_infoNCE_loss}')
         print(f'Train Gaussian Loss: {train_gaussian_loss}; Eval Gaussian Loss: {val_gaussian_loss}')
         print()
