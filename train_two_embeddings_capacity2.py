@@ -4,12 +4,13 @@ import argparse
 import torch
 import json
 import torch.nn.functional as F
-from datasets import load_from_disk
+from datasets import load_from_disk, load_dataset
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
 
+MAX_TOKENS = 300 # эмпирически выявлено
 
 # Dataset для текстов
 class TextDataset(Dataset):
@@ -45,7 +46,7 @@ def calculate_metrics(target, pred):
 def collate_fn(batch, tokenizer, device):
     texts = [item[0] for item in batch]
     indices = [item[1] for item in batch]
-    input_ids = [tokenizer.encode(text, return_tensors='pt').reshape(-1) for text in texts]
+    input_ids = [tokenizer.encode(text, return_tensors='pt', max_length=MAX_TOKENS, truncation=True).reshape(-1) for text in texts]
     lengths = [text.shape[0] for text in input_ids]
     input_ids = pad_sequence(input_ids, batch_first=True, padding_value=tokenizer.pad_token_id).to(device)
     attention_mask = (input_ids != tokenizer.pad_token_id).int()
@@ -72,7 +73,7 @@ def get_texts(data):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('--model_name', type=str, default='EleutherAI/pythia-410m')
+    parser.add_argument('--model_name', type=str, default='/userspace/pes/diploma_materials/Llama-3.2-1B')
     parser.add_argument('--maxiter', type=int, default=3000)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--min_words', type=int, default=5)
@@ -86,7 +87,7 @@ if __name__ == '__main__':
 
     torch.manual_seed(args.seed)
 
-    DATASET_NAME = 'C:\\Users\\79237\\Desktop\\diploma\\data'
+    DATASET_NAME = '/userspace/pes/diploma/data/data-00000-of-00001.arrow'
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     HYPERPARAMS = {
         'lr': 0.01,
@@ -94,14 +95,15 @@ if __name__ == '__main__':
         'betas': (0.9, 0.9)
     }
     
-    dataset = load_from_disk(DATASET_NAME)
+    dataset = load_dataset('arrow', data_files=DATASET_NAME)
+    dataset = dataset['train']
     df = dataset.to_pandas()
-    texts = get_texts(dataset)
+    all_texts = get_texts(dataset)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_auth_token=hf_token)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    text_dataset = TextDataset(texts)
+    text_dataset = TextDataset(all_texts)
     text_dataloader = DataLoader(text_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=lambda x: collate_fn(x, tokenizer, DEVICE))
 
     # Заморозка модели
@@ -111,9 +113,9 @@ if __name__ == '__main__':
     model.eval()
 
     result = []
-    SAVE_EVERY = 25
+    SAVE_EVERY = 50
     THRESHOLD = 0.9
-    SAVE_PATH = 'data/training_results.json'
+    SAVE_PATH = '/userspace/pes/diploma/data/training_paraphrase.json'
 
     for idx, batch in enumerate(tqdm(text_dataloader, desc='Processing dataset')):
         tokenized_text = batch['input_ids']
@@ -122,6 +124,8 @@ if __name__ == '__main__':
         indices = batch['indices']
         texts = batch['texts']
         labels = tokenized_text.clone()
+
+        print(f'Length: {lengths[0]}')
 
         # Создание обучаемых векторов e и m
         vectors = torch.nn.Parameter(torch.randn(2, model.config.hidden_size, device=DEVICE))
@@ -137,11 +141,10 @@ if __name__ == '__main__':
         max_seq_accuracy = 0.0
         best_vectors = None
         best_metrics = (0.0, 0.0, 0)
-        
-        # Ранняя остановка
-        patience = 0
+        last_iter = 0
 
         for iter in range(args.maxiter):
+            last_iter = iter
             optimizer.zero_grad()
 
             current_input = generate_input(vectors, lengths[0])
@@ -180,12 +183,13 @@ if __name__ == '__main__':
             'best_vectors': best_vectors.cpu().numpy().tolist()
         })
 
+        print(f'Processed {idx + 1}/{len(all_texts)}')
+        print(f'Max accuracy: {max_accuracy}. Iteration: {last_iter}')
+
         # Сохранение результатов
         if (idx + 1) % SAVE_EVERY == 0:
-            print(f'Processed {idx + 1}/{len(texts)}')
             with open(SAVE_PATH, 'w', encoding='utf-8') as f:
                 json.dump(result, f, ensure_ascii=False, indent=4)
-
     # Сохранение результатов
     with open(SAVE_PATH, 'w', encoding='utf-8') as f:
         json.dump(result, f, ensure_ascii=False, indent=4)

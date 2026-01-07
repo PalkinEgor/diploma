@@ -82,21 +82,21 @@ def safe_sample(group, n, seed):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('--model_name', type=str, default='EleutherAI/pythia-410m')
-    parser.add_argument('--maxiter', type=int, default=1300)
+    parser.add_argument('--model_name', type=str, default='/userspace/pes/diploma_materials/Llama-3.2-1B')
+    parser.add_argument('--maxiter', type=int, default=5000)
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--min_words', type=int, default=5)
-    parser.add_argument('--max_words', type=int, default=75)
+    parser.add_argument('--min_words', type=int, default=2)
+    parser.add_argument('--max_words', type=int, default=5000)
     parser.add_argument('--sample_size', type=int, default=float('inf'))
     parser.add_argument('--batch_size', type=int, default=1)
-    parser.add_argument('--init', type=str, default='mean')
+    parser.add_argument('--init', type=str, default='random')
     args = parser.parse_args()
-    load_dotenv()
-    hf_token = os.environ.get('HF_TOKEN')
+    # load_dotenv()
+    # hf_token = os.environ.get('HF_TOKEN')
 
     torch.manual_seed(args.seed)
 
-    DATASET_NAME = 'databricks/databricks-dolly-15k'
+    DATASET_NAME = '/userspace/pes/diploma_materials/dolly_dataset/train/data-00000-of-00001.arrow'
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     HYPERPARAMS = {
         'lr': 0.01,
@@ -104,7 +104,7 @@ if __name__ == '__main__':
         'betas': (0.9, 0.9)
     }
     
-    dataset = load_dataset(DATASET_NAME)
+    dataset = load_dataset('arrow', data_files=DATASET_NAME)
     df = dataset['train'].to_pandas()
 
     # Выбираем ответы, которые длиннее min_words слов
@@ -117,22 +117,22 @@ if __name__ == '__main__':
     # Обрезка слишком длинных ответов до max_words слов
     texts = [' '.join(text.split(' ')[:args.max_words]) if len(text.split(' ')) > args.max_words else text for text in texts]
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_auth_token=hf_token)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     text_dataset = TextDataset(texts)
     text_dataloader = DataLoader(text_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=lambda x: collate_fn(x, tokenizer, DEVICE))
 
     # Заморозка модели
-    model = AutoModelForCausalLM.from_pretrained(args.model_name, use_auth_token=hf_token).to(DEVICE)
+    model = AutoModelForCausalLM.from_pretrained(args.model_name).to(DEVICE)
     for param in model.parameters():
         param.requires_grad = False
     model.eval()
 
     result = []
     SAVE_EVERY = 25
-    THRESHOLD = 0.85
-    SOFT_THRESHOLD = 0.4
+    THRESHOLD = 0.95
+    # SOFT_THRESHOLD = 0.4
     SAVE_PATH = 'data/training_results.json'
 
     for idx, batch in enumerate(tqdm(text_dataloader, desc='Processing dataset')):
@@ -172,8 +172,8 @@ if __name__ == '__main__':
             # При достижении идеальной точности пропускаем пример
             if max_accuracy >= THRESHOLD:
                 break
-            if iter == 500 and max_accuracy < SOFT_THRESHOLD:
-                break
+            # if iter == 500 and max_accuracy < SOFT_THRESHOLD:
+            #     break
             
             # Берем предсказания без паддинга и считаем метрики
             current_pred = pred[0, :lengths[0]]
