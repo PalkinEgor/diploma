@@ -11,6 +11,7 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
 
 MAX_TOKENS = 250 # эмпирически выявлено
+SAMPLES = 2500
 
 # Dataset для текстов
 class TextDataset(Dataset):
@@ -86,7 +87,7 @@ if __name__ == '__main__':
     parser.add_argument('--min_words', type=int, default=5)
     parser.add_argument('--max_words', type=int, default=75)
     parser.add_argument('--sample_size', type=int, default=float('inf'))
-    parser.add_argument('--batch_size', type=int, default=1)
+    parser.add_argument('--batch_size', type=int, default=8)
     args = parser.parse_args()
     load_dotenv()
     hf_token = os.environ.get('HF_TOKEN')
@@ -103,6 +104,7 @@ if __name__ == '__main__':
     
     dataset = load_dataset('arrow', data_files=DATASET_NAME)
     dataset = dataset['train']
+    dataset = dataset.select(range(SAMPLES))
     df = dataset.to_pandas()
     all_texts = get_texts(dataset)
 
@@ -119,7 +121,7 @@ if __name__ == '__main__':
     model.eval()
 
     result = []
-    SAVE_EVERY = 50
+    SAVE_EVERY = 10
     THRESHOLD = 0.9
     SAVE_PATH = '/userspace/pes/diploma/data/training_paraphrase.json'
 
@@ -193,7 +195,7 @@ if __name__ == '__main__':
                 'best_vectors': best_vectors[i].cpu().numpy().tolist()
             })
 
-        print(f'Processed {idx + 1}/{len(all_texts)}')
+        print(f'Processed {idx + 1}/{len(text_dataloader)}')
         print(f'Iterations {last_iter}')
 
         # Сохранение результатов
