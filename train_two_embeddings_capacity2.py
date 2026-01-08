@@ -10,7 +10,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
 
-MAX_TOKENS = 300 # эмпирически выявлено
+MAX_TOKENS = 250 # эмпирически выявлено
 
 # Dataset для текстов
 class TextDataset(Dataset):
@@ -24,8 +24,15 @@ class TextDataset(Dataset):
         return self.texts[idx][1], self.texts[idx][0]
     
 # Создание схемы с одним e вектором и text_length - 1 m векторов
-def generate_input(vectors, text_length):
-    return torch.cat([vectors[0:1, :].unsqueeze(0), vectors[1:2, :].unsqueeze(0).expand(1, text_length - 1, -1)], dim=1)
+def generate_input(vectors, lengths, max_len, device):
+    B, _, H = vectors.shape
+    inputs = torch.zeros((B, max_len, H), device=device)
+    
+    for i, l in enumerate(lengths):
+        inputs[i, 0] = vectors[i, 0]
+        inputs[i, 1:l] = vectors[i, 1]
+
+    return inputs
 
 # Функция для расчета метрик. 
 # accuracy - точность на уровне токенов; 
@@ -49,7 +56,7 @@ def collate_fn(batch, tokenizer, device):
     input_ids = [tokenizer.encode(text, return_tensors='pt', max_length=MAX_TOKENS, truncation=True).reshape(-1) for text in texts]
     lengths = [text.shape[0] for text in input_ids]
     input_ids = pad_sequence(input_ids, batch_first=True, padding_value=tokenizer.pad_token_id).to(device)
-    attention_mask = (input_ids != tokenizer.pad_token_id).int()
+    attention_mask = (input_ids != tokenizer.pad_token_id).long()
     return {
         'input_ids': input_ids,
         'attention_mask': attention_mask,
@@ -80,7 +87,6 @@ if __name__ == '__main__':
     parser.add_argument('--max_words', type=int, default=75)
     parser.add_argument('--sample_size', type=int, default=float('inf'))
     parser.add_argument('--batch_size', type=int, default=1)
-    parser.add_argument('--init', type=str, default='random')
     args = parser.parse_args()
     load_dotenv()
     hf_token = os.environ.get('HF_TOKEN')
@@ -125,66 +131,70 @@ if __name__ == '__main__':
         texts = batch['texts']
         labels = tokenized_text.clone()
 
-        print(f'Length: {lengths[0]}')
+        B = tokenized_text.size(0)
 
         # Создание обучаемых векторов e и m
-        vectors = torch.nn.Parameter(torch.randn(2, model.config.hidden_size, device=DEVICE))
-        if args.init == 'mean':
-            with torch.no_grad():
-                emb = model.get_input_embeddings().weight
-                mean_vec = emb.mean(dim=0)
-                vectors[:] = mean_vec
+        vectors = torch.nn.Parameter(torch.randn(B, 2, model.config.hidden_size, device=DEVICE))
         optimizer = torch.optim.AdamW([vectors], lr=HYPERPARAMS['lr'], betas=HYPERPARAMS['betas'], weight_decay=HYPERPARAMS['weight_decay'])
 
         # Хранение лучших метрик
-        max_accuracy = 0.0
-        max_seq_accuracy = 0.0
-        best_vectors = None
-        best_metrics = (0.0, 0.0, 0)
+        max_accuracy = [0.0] * B
+        max_seq_accuracy = [0.0] * B
+        best_vectors = [None] * B
+        best_metrics = [(0.0, 0.0, 0)] * B
         last_iter = 0
 
         for iter in range(args.maxiter):
             last_iter = iter
             optimizer.zero_grad()
 
-            current_input = generate_input(vectors, lengths[0])
+            current_input = generate_input(vectors, lengths, tokenized_text.size(1), DEVICE)
             logits = model(inputs_embeds=current_input, attention_mask=attention_mask).logits
-            loss = torch.nn.functional.cross_entropy(logits[0, :, :], labels[0], ignore_index=tokenizer.pad_token_id)
-            pred = logits.argmax(dim=-1).view(tokenized_text.shape)
+            loss = torch.nn.functional.cross_entropy(
+                logits.view(-1, logits.size(-1)), 
+                labels.view(-1), 
+                ignore_index=tokenizer.pad_token_id)
+            pred = logits.argmax(dim=-1)
+
+            for i in range(B):
+                current_len = lengths[i]
+                current_pred = pred[i, :current_len]
+                current_labels = labels[i, :current_len]
+
+                accuracy, seq_accuracy, correct_prefix_length = calculate_metrics(current_labels, current_pred)
+                if (accuracy > max_accuracy[i]) or (accuracy == max_accuracy[i] and seq_accuracy > max_seq_accuracy[i]):
+                    max_accuracy[i] = accuracy
+                    max_seq_accuracy[i] = seq_accuracy
+                    best_metrics[i] = (accuracy, seq_accuracy, correct_prefix_length)
+                    best_vectors[i] = vectors[i].detach().clone()
 
             # При достижении идеальной точности пропускаем пример
-            if max_accuracy >= THRESHOLD:
+            good_ex = 0
+            for i in range(B):
+                if max_accuracy[i] >= THRESHOLD:
+                    good_ex += 1
+            if good_ex == B:
                 break
-
-            # Берем предсказания без паддинга и считаем метрики
-            current_pred = pred[0, :lengths[0]]
-            current_labels = labels[0, :lengths[0]]
-            accuracy, seq_accuracy, correct_prefix_length = calculate_metrics(current_labels, current_pred)
-            
-            # Сохранение лучших метрик
-            if (accuracy > max_accuracy) or (accuracy == max_accuracy and seq_accuracy > max_seq_accuracy):
-                max_accuracy = accuracy
-                max_seq_accuracy = seq_accuracy
-                best_metrics = (accuracy, seq_accuracy, correct_prefix_length)
-                best_vectors = vectors.detach().clone()
 
             loss.backward()
             optimizer.step()
 
         # Обновление результатов
-        result.append({
-            'instruction': df.iloc[indices[0]]['instruction'],
-            'context': df.iloc[indices[0]]['context'],
-            'category': df.iloc[indices[0]]['category'],
-            'text': df.iloc[indices[0]]['response'],
-            'accuracy': best_metrics[0],
-            'seq_accuracy': best_metrics[1],
-            'correct_prefix_len': best_metrics[2],
-            'best_vectors': best_vectors.cpu().numpy().tolist()
-        })
+        for i in range(B):
+            result.append({
+                'instruction': df.iloc[indices[i]]['instruction'],
+                'context': df.iloc[indices[i]]['context'],
+                'category': df.iloc[indices[i]]['category'],
+                'response': df.iloc[indices[i]]['response'],
+                'text': texts[i],
+                'accuracy': best_metrics[i][0],
+                'seq_accuracy': best_metrics[i][1],
+                'correct_prefix_len': best_metrics[i][2],
+                'best_vectors': best_vectors[i].cpu().numpy().tolist()
+            })
 
         print(f'Processed {idx + 1}/{len(all_texts)}')
-        print(f'Max accuracy: {max_accuracy}. Iteration: {last_iter}')
+        print(f'Iterations {last_iter}')
 
         # Сохранение результатов
         if (idx + 1) % SAVE_EVERY == 0:
