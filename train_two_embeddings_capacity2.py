@@ -10,8 +10,8 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
 
-MAX_TOKENS = 250 # эмпирически выявлено
-SAMPLES = 2500
+MAX_TOKENS = 512 # эмпирически выявлено
+SAMPLES = 2048
 
 # Dataset для текстов
 class TextDataset(Dataset):
@@ -27,7 +27,7 @@ class TextDataset(Dataset):
 # Создание схемы с одним e вектором и text_length - 1 m векторов
 def generate_input(vectors, lengths, max_len, device):
     B, _, H = vectors.shape
-    inputs = torch.zeros((B, max_len, H), device=device)
+    inputs = torch.zeros((B, max_len, H), device=device, dtype=vectors.dtype)
     
     for i, l in enumerate(lengths):
         inputs[i, 0] = vectors[i, 0]
@@ -51,12 +51,12 @@ def calculate_metrics(target, pred):
     return accuracy, seq_accuracy, correct_prefix_length
 
 # Подготовка батча перед подачей в модель
-def collate_fn(batch, tokenizer, device):
+def collate_fn(batch, tokenizer):
     texts = [item[0] for item in batch]
     indices = [item[1] for item in batch]
     input_ids = [tokenizer.encode(text, return_tensors='pt', max_length=MAX_TOKENS, truncation=True).reshape(-1) for text in texts]
     lengths = [text.shape[0] for text in input_ids]
-    input_ids = pad_sequence(input_ids, batch_first=True, padding_value=tokenizer.pad_token_id).to(device)
+    input_ids = pad_sequence(input_ids, batch_first=True, padding_value=tokenizer.pad_token_id)
     attention_mask = (input_ids != tokenizer.pad_token_id).long()
     return {
         'input_ids': input_ids,
@@ -82,12 +82,12 @@ def get_texts(data):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--model_name', type=str, default='/userspace/pes/diploma_materials/Llama-3.2-1B')
-    parser.add_argument('--maxiter', type=int, default=3000)
+    parser.add_argument('--maxiter', type=int, default=500)
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--min_words', type=int, default=5)
-    parser.add_argument('--max_words', type=int, default=75)
-    parser.add_argument('--sample_size', type=int, default=float('inf'))
-    parser.add_argument('--batch_size', type=int, default=8)
+    # parser.add_argument('--min_words', type=int, default=5)
+    # parser.add_argument('--max_words', type=int, default=75)
+    # parser.add_argument('--sample_size', type=int, default=float('inf'))
+    parser.add_argument('--batch_size', type=int, default=2)
     args = parser.parse_args()
     load_dotenv()
     hf_token = os.environ.get('HF_TOKEN')
@@ -108,14 +108,23 @@ if __name__ == '__main__':
     df = dataset.to_pandas()
     all_texts = get_texts(dataset)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_auth_token=hf_token)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_auth_token=hf_token, use_fast=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     text_dataset = TextDataset(all_texts)
-    text_dataloader = DataLoader(text_dataset, batch_size=args.batch_size, shuffle=False, collate_fn=lambda x: collate_fn(x, tokenizer, DEVICE))
+    text_dataloader = DataLoader(
+        text_dataset,
+        num_workers=2, 
+        batch_size=args.batch_size, 
+        shuffle=False, 
+        collate_fn=lambda x: collate_fn(x, tokenizer))
 
     # Заморозка модели
-    model = AutoModelForCausalLM.from_pretrained(args.model_name, use_auth_token=hf_token).to(DEVICE)
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_name, 
+        use_auth_token=hf_token, 
+        torch_dtype=torch.bfloat16, 
+        device_map='auto')
     for param in model.parameters():
         param.requires_grad = False
     model.eval()
@@ -126,9 +135,9 @@ if __name__ == '__main__':
     SAVE_PATH = '/userspace/pes/diploma/data/training_paraphrase.json'
 
     for idx, batch in enumerate(tqdm(text_dataloader, desc='Processing dataset')):
-        tokenized_text = batch['input_ids']
+        tokenized_text = batch['input_ids'].to(DEVICE)
         lengths = batch['lengths']
-        attention_mask = batch['attention_mask']
+        attention_mask = batch['attention_mask'].to(DEVICE)
         indices = batch['indices']
         texts = batch['texts']
         labels = tokenized_text.clone()
@@ -136,7 +145,7 @@ if __name__ == '__main__':
         B = tokenized_text.size(0)
 
         # Создание обучаемых векторов e и m
-        vectors = torch.nn.Parameter(torch.randn(B, 2, model.config.hidden_size, device=DEVICE))
+        vectors = torch.nn.Parameter(torch.randn(B, 2, model.config.hidden_size, device=DEVICE, dtype=model.dtype))
         optimizer = torch.optim.AdamW([vectors], lr=HYPERPARAMS['lr'], betas=HYPERPARAMS['betas'], weight_decay=HYPERPARAMS['weight_decay'])
 
         # Хранение лучших метрик
@@ -192,7 +201,7 @@ if __name__ == '__main__':
                 'accuracy': best_metrics[i][0],
                 'seq_accuracy': best_metrics[i][1],
                 'correct_prefix_len': best_metrics[i][2],
-                'best_vectors': best_vectors[i].cpu().numpy().tolist()
+                'best_vectors': best_vectors[i].float().cpu().numpy().tolist()
             })
 
         print(f'Processed {idx + 1}/{len(text_dataloader)}')
