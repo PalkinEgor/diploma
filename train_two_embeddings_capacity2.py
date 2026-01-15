@@ -82,12 +82,12 @@ def get_texts(data):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--model_name', type=str, default='/userspace/pes/diploma_materials/Llama-3.2-1B')
-    parser.add_argument('--maxiter', type=int, default=500)
+    parser.add_argument('--maxiter', type=int, default=2000)
     parser.add_argument('--seed', type=int, default=42)
     # parser.add_argument('--min_words', type=int, default=5)
     # parser.add_argument('--max_words', type=int, default=75)
     # parser.add_argument('--sample_size', type=int, default=float('inf'))
-    parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument('--batch_size', type=int, default=1)
     args = parser.parse_args()
     load_dotenv()
     hf_token = os.environ.get('HF_TOKEN')
@@ -104,7 +104,8 @@ if __name__ == '__main__':
     
     dataset = load_dataset('arrow', data_files=DATASET_NAME)
     dataset = dataset['train']
-    dataset = dataset.select(range(SAMPLES))
+    samples = min(len(dataset), SAMPLES)
+    dataset = dataset.select(range(samples))
     df = dataset.to_pandas()
     all_texts = get_texts(dataset)
 

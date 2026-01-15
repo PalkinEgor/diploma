@@ -10,7 +10,7 @@ DATASET_NAME = '/userspace/pes/diploma_materials/dolly_dataset/train/data-00000-
 MODEL_NAME = '/userspace/pes/diploma_materials/Qwen3-4B'
 SAVE_DIR = '/userspace/pes/diploma/data'
 RANDOM_SEED = 42
-SAMPLES = 5000
+SAMPLES = 70
 
 augmentations = ['shift', 'orfo', 'typo', 'delete', 'insert', 'multiply', 'swap']
 char_aug = CharAug(
@@ -22,7 +22,7 @@ char_aug = CharAug(
     platform='pc',
     random_seed=RANDOM_SEED,
     )
-aug_number = 2
+aug_number = 6
 
 def add_lexical(example):
     example['lexical'] = [char_aug.augment(text=example['response'], action=random.choice(augmentations)) 
@@ -32,7 +32,7 @@ def add_lexical(example):
 model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype='auto', device_map='auto')
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
-paraphrase_number = 3
+paraphrase_number = 9
 
 def prompt_builder(parafrase):
     prompt = f'''
@@ -113,14 +113,18 @@ data = data.map(add_lexical, desc='Generate lexical paraphrases')
 data_list = data.to_list()
 
 CHECKPOINT_FILE = '/userspace/pes/diploma/data/paraphrase_ckpt.jsonl'
-CHECKPOINT_STEP = 25
+CHECKPOINT_STEP = 10
 
 done = {}
-with open(CHECKPOINT_FILE, 'r') as f:
-    for line in f:
-        row = json.loads(line)
-        done[row['idx']] = row
-print(f'Load checkpoint {len(done)} samples')
+if os.path.exists(CHECKPOINT_FILE):
+    with open(CHECKPOINT_FILE, 'r') as f:
+        for line in f:
+            row = json.loads(line)
+            done[row['idx']] = row
+    print(f'Load checkpoint {len(done)} samples')
+else:
+    open(CHECKPOINT_FILE, 'w').close()
+    print('Checkpoint file created')
 
 with open(CHECKPOINT_FILE, 'a') as f:
     for i, row in enumerate(data_list):
