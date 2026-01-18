@@ -11,13 +11,12 @@ tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 def prompt_builder(category, sample_size):
     prompts = {
         'simple': f'''
-Generate {sample_size} English sentence.
+Generate different {sample_size} English sentence.
 
 Sentence type:
 - Simple declarative sentence
 - One subject and one predicate
 - No subordinate clauses
-- No commas
 
 Structure example:
 "The child sleeps."
@@ -55,7 +54,6 @@ Sentence type:
 - Simple interrogative sentence
 - Yes/no question
 - No modifiers
-- No commas
 
 Structure example:
 "Do birds sing?"
@@ -93,7 +91,6 @@ Sentence type:
 - Simple imperative sentence
 - No subject
 - No modifiers
-- No commas
 
 Structure example:
 "Run"
@@ -137,15 +134,15 @@ Structure examples:
 "Silence."
 
 Requirements:
-- 1–3 words
+- 1-3 words
 - No articles required
 - Return exactly {sample_size} paraphrases as a JSON array of strings.
 Only return valid JSON, do not include numbers or any additional text.
 '''
     }
-    return prompts[category]
+    return prompts[category] + "\nReturn JSON only. Start with '[' and end with ']'"
 
-def get_llm_answer(prompt, max_tokens=1024, temperature=0.4, top_p=0.8, do_sample=True):
+def get_llm_answer(prompt, max_tokens=1024, temperature=0.7, top_p=0.9, do_sample=True):
     messages = [
         {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
         {"role": "user", "content": prompt}
@@ -186,16 +183,22 @@ result = {
     'incentive_complex': [],
     'one_part': []
 }
-iterations = 10
-sample_size = 3
+iterations = 1
+sample_size = 30
+iteration = 0
 for cat in categories:
     for _ in range(iterations):
         try:
-            answer = safe_json_load(get_llm_answer(prompt_builder(cat, sample_size)))
+            llm_answer = get_llm_answer(prompt_builder(cat, sample_size))
+            answer = safe_json_load(llm_answer)
             result[cat].extend(answer)
         except Exception as e:
             print(f'Something went wrong: {e}')
+            print(f'Problem sentence: {llm_answer}')
+        iteration += 1
+        print(f'Progress: {iteration}/{len(categories) * iterations}')
 
 path = os.path.join(SAVE_DIR, 'syntax_llm.json')
 with open(path, 'w', encoding='utf-8') as f:
     json.dump(result, f)
+print('Data saved')
