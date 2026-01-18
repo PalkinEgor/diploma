@@ -94,8 +94,8 @@ if __name__ == '__main__':
         'weight_decay': 0.01,
         'betas': (0.9, 0.9)
     }
-    LLM_DATA = 'data/syntax_llm.json'
-    CFG_DATA = 'data/syntax_cfg.json'
+    LLM_DATA = '/userspace/pes/diploma/data/syntax_llm.json'
+    CFG_DATA = '/userspace/pes/diploma/data/syntax_cfg.json'
     with open(LLM_DATA, 'r', encoding='utf-8') as f:
         llm_data = json.load(f)
     with open(CFG_DATA, 'r', encoding='utf-8') as f:
