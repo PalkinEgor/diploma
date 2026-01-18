@@ -1,5 +1,6 @@
 import nltk
 import random
+import json
 import os
 from nltk.corpus import wordnet as wn
 from nltk.parse.generate import generate
@@ -218,6 +219,22 @@ def generate_sentences(sample_size, sentence_number=1):
             result[category].append(' '.join(sentence))      
     return result
 
-sample_size = {'noun': 30, 'verb': 30, 'adj': 30, 'adv': 30}
-res = generate_sentences(sample_size)
-print(res)
+sample_size = {'noun': 15, 'verb': 15, 'adj': 15, 'adv': 15}
+iterations = 30
+result = {
+    'simple': [],
+    'complex': [],
+    'question_simple': [],
+    'question_complex': [],
+    'incentive_simple': [],
+    'incentive_complex': [],
+    'one_part': []
+}
+for i in range(iterations):
+    current_result = generate_sentences(sample_size)
+    for cat in result.keys():
+        result[cat].extend(current_result[cat])
+
+with open('syntax_cfg.json', 'w', encoding='utf-8') as f:
+    json.dump(result, f)
+print('Data saved')
