@@ -1,0 +1,142 @@
+[
+    {
+        "alpha": 0.05,
+        "noise": "gaussian",
+        "accuracy": 0.8705109080602956,
+        "seq_accuracy": 0.5652709847007779,
+        "correct_prefix_length": 6.689922480620155
+    },
+    {
+        "alpha": 0.05,
+        "noise": "uniform",
+        "accuracy": 0.8585374595582947,
+        "seq_accuracy": 0.5422994530972141,
+        "correct_prefix_length": 6.627906976744186
+    },
+    {
+        "alpha": 0.05,
+        "noise": "sinusoidal",
+        "accuracy": 0.8741836205933445,
+        "seq_accuracy": 0.575650435500657,
+        "correct_prefix_length": 7.062015503875969
+    },
+    {
+        "alpha": 0.05,
+        "noise": "exponential",
+        "accuracy": 0.8586689829826355,
+        "seq_accuracy": 0.5412241034211924,
+        "correct_prefix_length": 6.782945736434108
+    },
+    {
+        "alpha": 0.1,
+        "noise": "gaussian",
+        "accuracy": 0.8077290811279948,
+        "seq_accuracy": 0.49055076282307136,
+        "correct_prefix_length": 5.325581395348837
+    },
+    {
+        "alpha": 0.1,
+        "noise": "uniform",
+        "accuracy": 0.820073525572932,
+        "seq_accuracy": 0.5079341470955541,
+        "correct_prefix_length": 5.751937984496124
+    },
+    {
+        "alpha": 0.1,
+        "noise": "sinusoidal",
+        "accuracy": 0.8219693152941474,
+        "seq_accuracy": 0.5108356148253167,
+        "correct_prefix_length": 5.550387596899225
+    },
+    {
+        "alpha": 0.1,
+        "noise": "exponential",
+        "accuracy": 0.8102210422818975,
+        "seq_accuracy": 0.49248523125477556,
+        "correct_prefix_length": 5.403100775193798
+    },
+    {
+        "alpha": 0.2,
+        "noise": "gaussian",
+        "accuracy": 0.7117879413819128,
+        "seq_accuracy": 0.41450017809814116,
+        "correct_prefix_length": 4.170542635658915
+    },
+    {
+        "alpha": 0.2,
+        "noise": "uniform",
+        "accuracy": 0.7117431715939396,
+        "seq_accuracy": 0.3993260217078865,
+        "correct_prefix_length": 4.077519379844961
+    },
+    {
+        "alpha": 0.2,
+        "noise": "sinusoidal",
+        "accuracy": 0.7309113962705746,
+        "seq_accuracy": 0.4353760000382288,
+        "correct_prefix_length": 4.209302325581396
+    },
+    {
+        "alpha": 0.2,
+        "noise": "exponential",
+        "accuracy": 0.7178622086842855,
+        "seq_accuracy": 0.3999154671681582,
+        "correct_prefix_length": 4.023255813953488
+    },
+    {
+        "alpha": 0.5,
+        "noise": "gaussian",
+        "accuracy": 0.5111119451448899,
+        "seq_accuracy": 0.22682554553660464,
+        "correct_prefix_length": 2.131782945736434
+    },
+    {
+        "alpha": 0.5,
+        "noise": "uniform",
+        "accuracy": 0.506716422101324,
+        "seq_accuracy": 0.22561396453352872,
+        "correct_prefix_length": 2.0310077519379846
+    },
+    {
+        "alpha": 0.5,
+        "noise": "sinusoidal",
+        "accuracy": 0.5221286132469658,
+        "seq_accuracy": 0.242914432679979,
+        "correct_prefix_length": 2.108527131782946
+    },
+    {
+        "alpha": 0.5,
+        "noise": "exponential",
+        "accuracy": 0.5185461140187212,
+        "seq_accuracy": 0.23218495018328655,
+        "correct_prefix_length": 1.945736434108527
+    },
+    {
+        "alpha": 1.0,
+        "noise": "gaussian",
+        "accuracy": 0.33477599824266147,
+        "seq_accuracy": 0.08616829032867863,
+        "correct_prefix_length": 0.7751937984496124
+    },
+    {
+        "alpha": 1.0,
+        "noise": "uniform",
+        "accuracy": 0.30401931881052696,
+        "seq_accuracy": 0.06298150751806006,
+        "correct_prefix_length": 0.6744186046511628
+    },
+    {
+        "alpha": 1.0,
+        "noise": "sinusoidal",
+        "accuracy": 0.3182051147861305,
+        "seq_accuracy": 0.08928301466788535,
+        "correct_prefix_length": 0.8914728682170543
+    },
+    {
+        "alpha": 1.0,
+        "noise": "exponential",
+        "accuracy": 0.33935377060240784,
+        "seq_accuracy": 0.09287319137729495,
+        "correct_prefix_length": 0.9147286821705426
+    }
+]
