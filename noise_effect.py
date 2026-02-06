@@ -153,7 +153,7 @@ if __name__ == '__main__':
     model.set_attn_implementation('eager')
     model.eval()
 
-    alpha = [0.05, 0.10, 0.20, 0.50, 1.00]
+    alpha = [0.00, 0.05, 0.10, 0.20, 0.50, 1.00]
     noise_types = ['gaussian', 'uniform', 'sinusoidal', 'exponential']
     result = []
     SAVE_PATH = 'noise_effect.json'
