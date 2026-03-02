@@ -18,6 +18,20 @@ class TextDataset(Dataset):
     def __getitem__(self, idx):
         return self.texts[idx], idx
 
+# Dataset для текстов
+class AlpacaDataset(Dataset):
+    def __init__(self, dataset):
+        dataset = dataset.filter(lambda x: x['input'] == '' or x['input'] == 'None')
+        dataset = dataset['train'].to_pandas()
+        self.texts = dataset['output'].to_list()
+        self.instructions = dataset['instruction'].to_list()
+    
+    def __len__(self):
+        return len(self.texts)
+    
+    def __getitem__(self, idx):
+        return self.texts[idx], self.instructions[idx]
+
 # Создание схемы с одним e вектором и text_length - 1 m векторов
 def generate_input(vectors, lengths, max_len, device):
     B, _, H = vectors.shape
@@ -51,6 +65,22 @@ def collate_fn(batch, tokenizer, max_tokens):
         'texts': texts
     }
 
+# Подготовка батча перед подачей в модель
+def collate_fn_alpaca(batch, tokenizer, max_tokens):
+    texts = [item[0] for item in batch]
+    instructions = [item[1] for item in batch]
+    input_ids = [tokenizer.encode(text, return_tensors='pt', max_length=max_tokens, truncation=True).reshape(-1) for text in texts]
+    lengths = [text.shape[0] for text in input_ids]
+    input_ids = pad_sequence(input_ids, batch_first=True, padding_value=tokenizer.pad_token_id)
+    attention_mask = (input_ids != tokenizer.pad_token_id).long()
+    return {
+        'input_ids': input_ids,
+        'attention_mask': attention_mask,
+        'lengths': lengths,
+        'instructions': instructions,
+        'texts': texts
+    }
+
 if __name__ == '__main__':
     # Входные параметры
     parser = argparse.ArgumentParser(description='')
@@ -64,7 +94,7 @@ if __name__ == '__main__':
     # Фиксируем сиды
     torch.manual_seed(args.seed)
 
-    DATASET_NAME = '/userspace/pes/diploma_materials/dolly_dataset'
+    DATASET_NAME = '/userspace/pes/diploma_materials/alpaca_data'
     HYPERPARAMS = {
         'lr': 0.01,
         'weight_decay': 0.01,
@@ -73,20 +103,18 @@ if __name__ == '__main__':
 
     # Достаем тексты
     dataset = load_from_disk(DATASET_NAME)
-    df = dataset['train'].to_pandas()
-    texts = df['response'].to_list()
 
     # Записываем в dataset и dataloader
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    text_dataset = TextDataset(texts)
+    text_dataset = AlpacaDataset(dataset)
     text_dataloader = DataLoader(
         text_dataset,
         num_workers=2, 
         batch_size=args.batch_size, 
         shuffle=False, 
-        collate_fn=lambda x: collate_fn(x, tokenizer, args.max_tokens))
+        collate_fn=lambda x: collate_fn_alpaca(x, tokenizer, args.max_tokens))
     
     # Заморозка модели
     model = AutoModelForCausalLM.from_pretrained(args.model_name, torch_dtype=torch.bfloat16, device_map='auto')
@@ -106,7 +134,7 @@ if __name__ == '__main__':
         tokenized_text = batch['input_ids'].to(DEVICE)
         lengths = batch['lengths']
         attention_mask = batch['attention_mask'].to(DEVICE)
-        indices = batch['indices']
+        instructions = batch['instructions']
         texts = batch['texts']
         labels = tokenized_text.clone()
         B = tokenized_text.size(0)
@@ -163,14 +191,14 @@ if __name__ == '__main__':
         print(f'Processed {idx + 1}/{len(text_dataloader)}')
         print(f'Success rate {t_count}/{p_count}')
         print(f'Last iteration {last_iter}')
+        print(f'Length {lengths[0]}')
+        print(f'Max accuracy {max_accuracy[0]}')
         print()
 
         # Обновление результатов
         for i in range(B):
             result.append({
-                'instruction': df.iloc[indices[i]]['instruction'],
-                'context': df.iloc[indices[i]]['context'],
-                'category': df.iloc[indices[i]]['category'],
+                'instruction': instructions[i],
                 'text': texts[i],
                 'accuracy': max_accuracy[i],
                 'best_vectors': best_vectors[i].float().cpu().numpy().tolist()
