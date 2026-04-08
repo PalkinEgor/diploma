@@ -12,10 +12,10 @@ from torch.utils.data import DataLoader
 
 
 HYPERPARAMS = {
-        'lr': 0.01,
-        'weight_decay': 0.01,
-        'betas': (0.9, 0.9)
-    }
+    'lr': 0.01,
+    'weight_decay': 0.01,
+    'betas': (0.9, 0.9)
+}
 
 DTYPE_MAP = {
     'float32': torch.float32,
