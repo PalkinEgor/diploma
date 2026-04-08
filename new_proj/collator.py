@@ -12,11 +12,14 @@ def collate_alpaca(batch, tokenizer, max_tokens):
     attention_mask = (input_ids != tokenizer.pad_token_id).long()
 
     return {
-        'texts': texts,
-        'instructions': instructions,
         'input_ids': input_ids,
         'attention_mask': attention_mask,
-        'lengths': lengths
+        'lengths': lengths,
+        'labels': input_ids.clone(),
+        'metainfo': {
+            'texts': texts,
+            'instructions': instructions
+        }
     }
 
 # Для датасета databricks/databricks-dolly-15k
@@ -31,10 +34,22 @@ def collate_dolly(batch, tokenizer, max_tokens):
     attention_mask = (input_ids != tokenizer.pad_token_id).long()
 
     return {
-        'texts': texts,
-        'instructions': instructions,
-        'categories': categories,
         'input_ids': input_ids,
         'attention_mask': attention_mask,
-        'lengths': lengths
+        'lengths': lengths,
+        'labels': input_ids.clone(),
+        'metainfo': {
+            'texts': texts,
+            'instructions': instructions,
+            'categories': categories
+        }
     }
+
+# Фабрика для выбора коллатора
+def get_collator(dataset_type, tokenizer, max_tokens):
+    if dataset_type == 'alpaca':
+        return lambda batch: collate_alpaca(batch, tokenizer, max_tokens)
+    elif dataset_type == 'dolly':
+        return lambda batch: collate_dolly(batch, tokenizer, max_tokens)
+    else:
+        raise ValueError(f'Unknown dataset: {dataset_type}')

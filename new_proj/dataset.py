@@ -28,3 +28,12 @@ class DollyDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.texts[idx], self.instructions[idx], self.categories[idx]
+    
+# Фабрика для выбора датасета
+def get_dataset(dataset_type, raw_dataset):
+    if dataset_type == 'alpaca':
+        return AlpacaDataset(raw_dataset)
+    elif dataset_type == 'dolly':
+        return DollyDataset(raw_dataset)
+    else:
+        raise ValueError(f'Unknown dataset: {dataset_type}')

@@ -1,5 +1,11 @@
 import torch
+import yaml
 
+
+# Загружаем конфиг эксперимента
+def load_config(path):
+    with open(path, 'r') as f:
+        return yaml.safe_load(f)
 
 # Создание схемы с одним e вектором и text_length - 1 m векторов
 def generate_input(vectors, lengths, max_len, pad_embed, device):

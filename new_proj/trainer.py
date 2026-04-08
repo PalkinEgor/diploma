@@ -1,6 +1,6 @@
 import torch
 from utils import generate_input
-from metrics import calculate_accuracy
+from metrics import Metrics
 
 
 class NARfit:
@@ -16,7 +16,7 @@ class NARfit:
         tokenized_text = batch['input_ids'].to(self.device)
         attention_mask = batch['attention_mask'].to(self.device)
         lengths = batch['lengths']
-        labels = tokenized_text.clone()
+        labels = batch['labels'].to(self.device)
 
         # Создание обучаемых векторов e и m
         B = tokenized_text.shape[0]
@@ -59,7 +59,7 @@ class NARfit:
                 current_pred = pred[i, :current_len]
                 current_labels = labels[i, :current_len]
 
-                accuracy = calculate_accuracy(current_labels, current_pred)
+                accuracy = Metrics.calculate_accuracy(current_labels, current_pred)
                 if accuracy > max_accuracy[i]:
                     max_accuracy[i] = accuracy
                     best_vectors[i] = vectors[i].detach().clone()
@@ -71,4 +71,4 @@ class NARfit:
             loss.backward()
             optimizer.step()
 
-        return max_accuracy, best_vectors, last_iter
+        return max_accuracy, best_vectors, last_iter, B
