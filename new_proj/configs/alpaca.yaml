@@ -17,4 +17,5 @@ training:
 
 logging:
   save_every: 10
+  save_log_path: /userspace/pes/diploma/logs/nar_alpaca_exp.json
   save_path: /userspace/pes/diploma/results/nar_alpaca_exp.json

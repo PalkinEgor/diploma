@@ -34,9 +34,8 @@ class NARfit:
         # Запускаем maxiter итераций обучения
         max_accuracy = [0.0] * B
         best_vectors = [None] * B
-        last_iter = 0
+        last_iter = [None] * B
         for iter in range(maxiter):
-            last_iter = iter
             optimizer.zero_grad()
 
             # Считаем лосс и делаем предсказания
@@ -63,6 +62,9 @@ class NARfit:
                 if accuracy > max_accuracy[i]:
                     max_accuracy[i] = accuracy
                     best_vectors[i] = vectors[i].detach().clone()
+
+                if last_iter[i] is None and accuracy >= threshold:
+                    last_iter[i] = iter
             
             # Пропускаем итерацию если батч обучен
             if all(a >= threshold for a in max_accuracy):
@@ -71,4 +73,8 @@ class NARfit:
             loss.backward()
             optimizer.step()
 
+        for i in range(B):
+            if last_iter[i] is None:
+                last_iter[i] = maxiter
+                
         return max_accuracy, best_vectors, last_iter, B
