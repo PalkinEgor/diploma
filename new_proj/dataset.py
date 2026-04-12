@@ -1,3 +1,4 @@
+import json
 from torch.utils.data import Dataset
 
 
@@ -28,12 +29,31 @@ class DollyDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.texts[idx], self.instructions[idx], self.categories[idx]
+
+# Для зашумленных векторов
+class NoiseDataset(Dataset):
+    def __init__(self, path, threshold=0.9):
+        with open(path, 'r', encoding='utf-8') as f:
+            dataset = json.load(f)
+
+        data = [{'text': item['texts'], 'best_vectors': item['best_vectors']} for item in dataset if item['accuracy'] >= threshold]
+        self.texts = [item['text'] for item in data]
+        self.e_vectors = [item['best_vectors'][0] for item in data]
+        self.v_vectors = [item['best_vectors'][1] for item in data]
+
+    def __len__(self):
+        return len(self.texts)
+    
+    def __getitem__(self, idx):
+        return self.texts[idx], self.e_vectors[idx], self.v_vectors[idx]
     
 # Фабрика для выбора датасета
-def get_dataset(dataset_type, raw_dataset):
+def get_dataset(dataset_type, raw_dataset=None, path=None):
     if dataset_type == 'alpaca':
         return AlpacaDataset(raw_dataset)
     elif dataset_type == 'dolly':
         return DollyDataset(raw_dataset)
+    elif dataset_type == 'noise':
+        return NoiseDataset(path)
     else:
         raise ValueError(f'Unknown dataset: {dataset_type}')

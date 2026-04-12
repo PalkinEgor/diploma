@@ -1,8 +1,11 @@
 import torch
+import random
+import math
 from utils import generate_input
 from metrics import Metrics
 
 
+# Класс для обучения прото-токенов
 class NARfit:
     def __init__(self, model, tokenizer, device, hyperparams):
         self.model = model
@@ -78,3 +81,82 @@ class NARfit:
                 last_iter[i] = maxiter
                 
         return max_accuracy, best_vectors, last_iter, B
+
+# Класс для зашумленных векторов    
+class NoiseExp:
+    def __init__(self, model, tokenizer, device):
+        self.model = model
+        self.tokenizer = tokenizer
+        self.device = device
+        self.pad_emb = model.get_input_embeddings().weight[tokenizer.pad_token_id]
+        self.alpha = [0.00, 0.05, 0.10, 0.20, 0.50, 1.00]
+        self.noise_types = ['gaussian', 'uniform', 'sinusoidal', 'exponential']
+
+    # Получаем вектор шума
+    def get_noise(self, shape, alpha, noise_type, ref_vector):
+        if noise_type == 'gaussian':
+            noise = torch.randn(shape, device=self.device, dtype=self.model.dtype)
+
+        elif noise_type == 'uniform':
+            noise = torch.rand(shape, device=self.device, dtype=self.model.dtype) * 2 - 1 # равномерное распределние в таких границах [-1, 1]
+
+        elif noise_type == 'exponential':
+            noise = torch.distributions.Exponential(1.0).sample(shape).to(device=self.device, dtype=self.model.dtype)
+            noise *= torch.randint(0, 2, shape, device=self.device, dtype=self.model.dtype) * 2 - 1
+
+        elif noise_type == 'sinusoidal':
+            size = shape[-1]
+            k = random.choice(range(4, 33))
+            freq = 2 * math.pi * k / size            
+            phase = random.uniform(0, math.pi * 2)
+
+            x = torch.arange(size, device=self.device, dtype=self.model.dtype)
+            noise = torch.sin(freq * x + phase).to(device=self.device, dtype=self.model.dtype)
+
+        else:
+            noise = torch.randn(shape, device=self.device, dtype=self.model.dtype)
+
+        # Нормализация
+        norm = torch.norm(noise, dtype=self.model.dtype)
+        if norm > 0:
+            noise = noise / norm
+        noise = noise * torch.norm(ref_vector, dtype=self.model.dtype) * alpha
+
+        return noise
+    
+    def run_batch(self, batch):
+        # Парсинг батча
+        tokenized_text = batch['input_ids'].to(device=self.device)
+        attention_mask = batch['attention_mask'].to(device=self.device)        
+        lengths = batch['lengths']
+        e_vectors_orig = torch.tensor(batch['e_vectors'], device=self.device, dtype=self.model.dtype)
+        m_vectors = torch.tensor(batch['m_vectors'], device=self.device, dtype=self.model.dtype)
+        B = tokenized_text.shape[0]
+
+        result = []
+        for a in self.alpha:
+            for noise_type in self.noise_types:
+                # Добавляем шум
+                e_vectors = e_vectors_orig.clone()
+                for i in range(B):
+                    noise = self.get_noise(e_vectors[i].shape, a, noise_type, e_vectors[i])
+                    e_vectors[i] += noise
+
+                # Делаем forward pass
+                vectors = torch.stack([e_vectors, m_vectors], dim=1)
+                current_input = generate_input(vectors, lengths, tokenized_text.size(1), self.pad_emb, self.device)
+                with torch.no_grad():
+                    logits = self.model(inputs_embeds=current_input, attention_mask=attention_mask).logits
+                    pred = logits.argmax(dim=-1)
+                
+                # Cчитаем метрики
+                for i in range(B):
+                    current_len = lengths[i]
+                    current_pred = pred[i, :current_len]
+                    current_labels = tokenized_text[i, :current_len]
+                    accuracy = Metrics.calculate_accuracy(current_labels, current_pred)
+                    
+                    item = {'alpha': a, 'noise_type': noise_type, 'accuracy': accuracy}
+                    result.append(item)
+
+        return result

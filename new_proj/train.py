@@ -1,5 +1,6 @@
 import argparse
 import torch
+import random
 import json
 import logging
 from datasets import load_from_disk
@@ -25,6 +26,7 @@ DTYPE_MAP = {
 
 def fix_seeds(seed):
     torch.manual_seed(seed)
+    random.seed(seed)
 
 def setup_logger(path):
     logging.basicConfig(
