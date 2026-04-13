@@ -1,11 +1,13 @@
 import json
 from torch.utils.data import Dataset
+from datasets import load_from_disk
 
 
 # Для датасета yahma/alpaca-cleaned
 class AlpacaDataset(Dataset):
-    def __init__(self, dataset):
-        dataset = dataset.filter(lambda x: x['input'] == '' or x['input'] == 'None')
+    def __init__(self, path):
+        raw_dataset = load_from_disk(path)
+        dataset = raw_dataset.filter(lambda x: x['input'] == '' or x['input'] == 'None')
         dataset = dataset['train'].to_pandas()
         self.texts = dataset['output'].to_list()
         self.instructions = dataset['instruction'].to_list()
@@ -18,8 +20,9 @@ class AlpacaDataset(Dataset):
 
 # Для датасета databricks/databricks-dolly-15k
 class DollyDataset(Dataset):
-    def __init__(self, dataset):
-        dataset = dataset['train'].to_pandas()
+    def __init__(self, path):
+        raw_dataset = load_from_disk(path)
+        dataset = raw_dataset['train'].to_pandas()
         self.texts = dataset['response'].to_list()
         self.instructions = dataset['instruction'].to_list()
         self.categories = dataset['category'].to_list()
@@ -48,11 +51,11 @@ class NoiseDataset(Dataset):
         return self.texts[idx], self.e_vectors[idx], self.v_vectors[idx]
     
 # Фабрика для выбора датасета
-def get_dataset(dataset_type, raw_dataset=None, path=None):
+def get_dataset(dataset_type, path=None):
     if dataset_type == 'alpaca':
-        return AlpacaDataset(raw_dataset)
+        return AlpacaDataset(path)
     elif dataset_type == 'dolly':
-        return DollyDataset(raw_dataset)
+        return DollyDataset(path)
     elif dataset_type == 'noise':
         return NoiseDataset(path)
     else:
