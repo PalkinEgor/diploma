@@ -140,6 +140,51 @@ class CodeBookFit:
         self.optimizer.step()
 
         return loss.item(), accuracies
+    
+    def run_batch(self, batch):
+        self.encoder_model.eval()
+        self.decoder_model.eval()
+        accuracies = []
+
+        # Парсим батч
+        tokenized_instruction = batch['instruction']['input_ids'].to(device=self.device)
+        tokenized_answers = batch['answer']['input_ids'].to(device=self.device)
+        instruction_attention_mask = batch['instruction']['attention_mask'].to(self.device)
+        answer_attention_mask = batch['answer']['attention_mask'].to(self.device)
+        answer_lengths = batch['answer']['lengths']
+        labels = batch['answer']['labels'].to(self.device)
+        B = tokenized_instruction.shape[0]
+
+        with torch.no_grad():
+            # Получаем e и m вектора из енкодера
+            e_vector, m_vector = self.encoder_model(tokenized_instruction, instruction_attention_mask)
+            vectors = torch.stack([e_vector, m_vector], dim=1).to(device=self.device, dtype=self.decoder_model.dtype)
+            current_input = generate_input(
+                vectors,
+                answer_lengths,
+                tokenized_answers.size(1),
+                self.decoder_pad_emb,
+                self.device
+            )
+
+            # Считаем лосс
+            logits = self.decoder_model(inputs_embeds=current_input, attention_mask=answer_attention_mask).logits
+            loss = torch.nn.functional.cross_entropy(
+                logits.view(-1, logits.size(-1)), 
+                labels.view(-1), 
+                ignore_index=self.tokenizer.pad_token_id
+            )
+            pred = logits.argmax(dim=-1)
+
+        # Считаем метрики
+        for i in range(B):
+            current_len = answer_lengths[i]
+            current_pred = pred[i, :current_len]
+            current_labels = labels[i, :current_len]
+            accuracy = Metrics.calculate_accuracy(current_labels, current_pred)
+            accuracies.append(accuracy)
+        
+        return loss.item(), accuracies
 
 # Класс для зашумленных векторов    
 class NoiseExp:
