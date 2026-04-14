@@ -34,7 +34,7 @@ class DollyDataset(Dataset):
         return self.texts[idx], self.instructions[idx], self.categories[idx]
 
 # Для датасета databricks/databricks-dolly-15k, для задачи end2end    
-class DollyDatasetEnd2End(Dataset):
+class DollyDatasetEnd2End():
     def __init__(self, path, threshold=0.9):
         with open(path, 'r', encoding='utf-8') as f:
             dataset = json.load(f)
@@ -49,15 +49,9 @@ class DollyDatasetEnd2End(Dataset):
         self.categories = [item['category'] for item in data]
         self.e_vectors = [item['best_vectors'][0] for item in data]
         self.m_vectors = [item['best_vectors'][1] for item in data]
-    
-    def __len__(self):
-        return len(self.texts)
-
-    def __getitem__(self, idx):
-        return self.texts[idx], self.instructions[idx], self.categories[idx], self.e_vectors[idx], self.m_vectors[idx]
 
 # Для датасета yahma/alpaca-cleaned, для задачи end2end    
-class AlpacaDatasetEnd2End(Dataset):
+class AlpacaDatasetEnd2End():
     def __init__(self, path, threshold=0.9):
         with open(path, 'r', encoding='utf-8') as f:
             dataset = json.load(f)
@@ -70,12 +64,6 @@ class AlpacaDatasetEnd2End(Dataset):
         self.instructions = [item['instruction'] for item in data]
         self.e_vectors = [item['best_vectors'][0] for item in data]
         self.m_vectors = [item['best_vectors'][1] for item in data]
-    
-    def __len__(self):
-        return len(self.texts)
-
-    def __getitem__(self, idx):
-        return self.texts[idx], self.instructions[idx], self.e_vectors[idx], self.m_vectors[idx]
 
 # Для зашумленных векторов
 class NoiseDataset(Dataset):
@@ -95,22 +83,12 @@ class NoiseDataset(Dataset):
         return self.texts[idx], self.e_vectors[idx], self.v_vectors[idx]
     
 # Фабрика для выбора датасета
-def get_dataset(dataset_type, task_type, path):
-    if task_type == 'end2end':
-        if dataset_type == 'alpaca':
-            return AlpacaDatasetEnd2End(path)
-        elif dataset_type == 'dolly':
-            return DollyDatasetEnd2End(path)
-        else:
-            raise ValueError(f'Unknown dataset: {dataset_type}')
-    elif task_type == 'reconstruction':
-        if dataset_type == 'alpaca':
-            return AlpacaDataset(path)
-        elif dataset_type == 'dolly':
-            return DollyDataset(path)
-        elif dataset_type == 'noise':
-            return NoiseDataset(path)
-        else:
-            raise ValueError(f'Unknown dataset: {dataset_type}')
+def get_dataset(dataset_type, path):
+    if dataset_type == 'alpaca':
+        return AlpacaDataset(path)
+    elif dataset_type == 'dolly':
+        return DollyDataset(path)
+    elif dataset_type == 'noise':
+        return NoiseDataset(path)
     else:
         raise ValueError(f'Unknown dataset: {dataset_type}')
