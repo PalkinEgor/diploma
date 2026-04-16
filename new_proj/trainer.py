@@ -122,7 +122,7 @@ class CodeBookFit:
         # Считаем лосс
         logits = self.decoder_model(inputs_embeds=current_input, attention_mask=answer_attention_mask).logits
         loss = torch.nn.functional.cross_entropy(
-            logits.view(-1, logits.size(-1)), 
+            logits.reshape(-1, logits.size(-1)), 
             labels.view(-1), 
             ignore_index=self.tokenizer.pad_token_id
         )

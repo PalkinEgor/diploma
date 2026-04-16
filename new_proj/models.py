@@ -16,8 +16,9 @@ class CodeBooksModel(nn.Module):
         self.decoder.eval()
         self.e_classifier = nn.Linear(self.encoder.config.hidden_size, e_code_books.shape[0])
         self.m_classifier = nn.Linear(self.encoder.config.hidden_size, m_code_books.shape[0])
-        self.e_code_books = torch.nn.Parameter(e_code_books)
-        self.m_code_books = torch.nn.Parameter(m_code_books)
+        self.e_code_books = torch.nn.Parameter(e_code_books.to(dtype=dtype))
+        self.m_code_books = torch.nn.Parameter(m_code_books.to(dtype=dtype))
+        self.dtype = dtype
     
     def forward(self, input_ids, attention_mask=None):
         x = self.encoder(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state[:, -1, :]
@@ -33,3 +34,14 @@ class CodeBooksModel(nn.Module):
         m_code_book = m_probs @ self.m_code_books
         
         return e_code_book, m_code_book
+
+# Полная модель с использованием кодовых книг (work in progress)
+class FullCodeBooksModel(nn.Module):
+    def __init__(self, encoder_codebook, decoder_name):
+        super.__init__()
+
+        self.encoder_codebook = encoder_codebook
+        self.decoder = AutoModelForCausalLM.from_pretrained(decoder_name, torch_dtype=encoder_codebook.dtype, device_map='auto')
+        for param in self.decoder.parameters():
+            param.requires_grad = False
+        self.decoder.eval()

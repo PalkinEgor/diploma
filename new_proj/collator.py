@@ -45,7 +45,7 @@ def collate_dolly(batch, tokenizer, max_tokens):
         }
     }
 
-# # Для датасета yahma/alpaca-cleaned, для задачи end2end
+# Для датасета yahma/alpaca-cleaned, для задачи end2end
 def collate_alpaca_end2end(batch, tokenizer, max_tokens):
     texts = [item[0] for item in batch]
     instructions = [item[1] for item in batch]
