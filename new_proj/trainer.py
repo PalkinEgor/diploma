@@ -84,43 +84,37 @@ class NARfit:
 
 # Для моедели на основе кодовых книг    
 class CodeBookFit:
-    def __init__(self, encoder_model, decoder_model, optimizer, tokenizer, device, hyperparams):
-        self.encoder_model = encoder_model
-        self.decoder_model = decoder_model
+    def __init__(self, full_model, optimizer, tokenizer, device, hyperparams):
+        self.full_model = full_model
         self.optimizer = optimizer
         self.tokenizer = tokenizer
         self.device = device
         self.hyperparams = hyperparams
-        self.decoder_pad_emb = decoder_model.get_input_embeddings().weight[tokenizer.pad_token_id].to(self.device)
     
     def train_batch(self, batch):
-        self.encoder_model.train()
-        self.decoder_model.eval()
+        self.full_model.train()
         self.optimizer.zero_grad()
-        accuracies = []        
+        accuracies = []     
 
         # Парсим батч
-        tokenized_instruction = batch['instruction']['input_ids'].to(device=self.device)
-        tokenized_answers = batch['answer']['input_ids'].to(device=self.device)
+        tokenized_instruction = batch['instruction']['input_ids'].to(self.device)
+        tokenized_answers = batch['answer']['input_ids'].to(self.device)
         instruction_attention_mask = batch['instruction']['attention_mask'].to(self.device)
         answer_attention_mask = batch['answer']['attention_mask'].to(self.device)
         answer_lengths = batch['answer']['lengths']
         labels = batch['answer']['labels'].to(self.device)
         B = tokenized_instruction.shape[0]
 
-        # Получаем e и m вектора из енкодера
-        e_vector, m_vector = self.encoder_model(tokenized_instruction, instruction_attention_mask)
-        vectors = torch.stack([e_vector, m_vector], dim=1).to(device=self.device, dtype=self.decoder_model.dtype)
-        current_input = generate_input(
-            vectors,
-            answer_lengths,
-            tokenized_answers.size(1),
-            self.decoder_pad_emb,
-            self.device
+        # Получаем логиты
+        logits = self.full_model(
+            tokenized_instruction,
+            tokenized_answers,
+            instruction_attention_mask,
+            answer_attention_mask,
+            answer_lengths
         )
 
         # Считаем лосс
-        logits = self.decoder_model(inputs_embeds=current_input, attention_mask=answer_attention_mask).logits
         loss = torch.nn.functional.cross_entropy(
             logits.reshape(-1, logits.size(-1)), 
             labels.view(-1), 
@@ -135,20 +129,19 @@ class CodeBookFit:
             current_labels = labels[i, :current_len]
             accuracy = Metrics.calculate_accuracy(current_labels, current_pred)
             accuracies.append(accuracy)
-        
+
         loss.backward()
         self.optimizer.step()
 
         return loss.item(), accuracies
     
     def run_batch(self, batch):
-        self.encoder_model.eval()
-        self.decoder_model.eval()
+        self.full_model.eval()
         accuracies = []
 
         # Парсим батч
-        tokenized_instruction = batch['instruction']['input_ids'].to(device=self.device)
-        tokenized_answers = batch['answer']['input_ids'].to(device=self.device)
+        tokenized_instruction = batch['instruction']['input_ids'].to(self.device)
+        tokenized_answers = batch['answer']['input_ids'].to(self.device)
         instruction_attention_mask = batch['instruction']['attention_mask'].to(self.device)
         answer_attention_mask = batch['answer']['attention_mask'].to(self.device)
         answer_lengths = batch['answer']['lengths']
@@ -156,22 +149,18 @@ class CodeBookFit:
         B = tokenized_instruction.shape[0]
 
         with torch.no_grad():
-            # Получаем e и m вектора из енкодера
-            e_vector, m_vector = self.encoder_model(tokenized_instruction, instruction_attention_mask)
-            vectors = torch.stack([e_vector, m_vector], dim=1).to(device=self.device, dtype=self.decoder_model.dtype)
-            current_input = generate_input(
-                vectors,
-                answer_lengths,
-                tokenized_answers.size(1),
-                self.decoder_pad_emb,
-                self.device
+            logits = self.full_model(
+                tokenized_instruction,
+                tokenized_answers,
+                instruction_attention_mask,
+                answer_attention_mask,
+                answer_lengths
             )
 
             # Считаем лосс
-            logits = self.decoder_model(inputs_embeds=current_input, attention_mask=answer_attention_mask).logits
             loss = torch.nn.functional.cross_entropy(
-                logits.view(-1, logits.size(-1)), 
-                labels.view(-1), 
+                logits.reshape(-1, logits.size(-1)),
+                labels.view(-1),
                 ignore_index=self.tokenizer.pad_token_id
             )
             pred = logits.argmax(dim=-1)
@@ -183,7 +172,7 @@ class CodeBookFit:
             current_labels = labels[i, :current_len]
             accuracy = Metrics.calculate_accuracy(current_labels, current_pred)
             accuracies.append(accuracy)
-        
+
         return loss.item(), accuracies
 
 # Класс для зашумленных векторов    

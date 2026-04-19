@@ -1,19 +1,16 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from utils import generate_input
 from transformers import AutoModel, AutoModelForCausalLM
 
 
 # Модель с использованием кодовых книг
-class CodeBooksModel(nn.Module):
-    def __init__(self, encoder_name, decoder_name, e_code_books, m_code_books, dtype):
+class EncoderCodeBooksModel(nn.Module):
+    def __init__(self, encoder_name, e_code_books, m_code_books, dtype):
         super().__init__()
 
         self.encoder = AutoModel.from_pretrained(encoder_name, torch_dtype=dtype, device_map='auto')
-        self.decoder = AutoModelForCausalLM.from_pretrained(decoder_name, torch_dtype=dtype, device_map='auto')
-        for param in self.decoder.parameters():
-            param.requires_grad = False
-        self.decoder.eval()
         self.e_classifier = nn.Linear(self.encoder.config.hidden_size, e_code_books.shape[0])
         self.m_classifier = nn.Linear(self.encoder.config.hidden_size, m_code_books.shape[0])
         self.e_code_books = torch.nn.Parameter(e_code_books.to(dtype=dtype))
@@ -37,11 +34,31 @@ class CodeBooksModel(nn.Module):
 
 # Полная модель с использованием кодовых книг (work in progress)
 class FullCodeBooksModel(nn.Module):
-    def __init__(self, encoder_codebook, decoder_name):
-        super.__init__()
+    def __init__(self, encoder_model, decoder_name, tokenizer, dtype):
+        super().__init__()
 
-        self.encoder_codebook = encoder_codebook
-        self.decoder = AutoModelForCausalLM.from_pretrained(decoder_name, torch_dtype=encoder_codebook.dtype, device_map='auto')
+        self.encoder_model = encoder_model
+        self.decoder = AutoModelForCausalLM.from_pretrained(decoder_name, torch_dtype=dtype, device_map='auto')
         for param in self.decoder.parameters():
             param.requires_grad = False
         self.decoder.eval()
+
+        self.pad_token_id = tokenizer.pad_token_id
+        self.decoder_pad_emb = self.decoder.get_input_embeddings().weight[self.pad_token_id]
+
+        self.dtype = dtype
+
+    def forward(self, tokenized_instruction, tokenized_answers, instruction_attention_mask, answer_attention_mask, answer_lengths):
+        e_vector, m_vector = self.encoder_model(tokenized_instruction, instruction_attention_mask)
+        vectors = torch.stack([e_vector, m_vector], dim=1)
+        vectors = vectors.to(dtype=self.decoder.dtype)
+        current_input = generate_input(
+            vectors,
+            answer_lengths,
+            tokenized_answers.size(1),
+            self.decoder_pad_emb,
+            vectors.device
+        )
+
+        logits = self.decoder(inputs_embeds=current_input, attention_mask=answer_attention_mask).logits
+        return logits

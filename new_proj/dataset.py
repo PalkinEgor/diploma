@@ -34,7 +34,7 @@ class DollyDataset(Dataset):
         return self.texts[idx], self.instructions[idx], self.categories[idx]
 
 # Для датасета databricks/databricks-dolly-15k, для задачи end2end    
-class DollyDatasetEnd2End():
+class DollyDatasetEnd2End(Dataset):
     def __init__(self, path, threshold=0.9):
         with open(path, 'r', encoding='utf-8') as f:
             dataset = json.load(f)
@@ -49,6 +49,12 @@ class DollyDatasetEnd2End():
         self.categories = [item['category'] for item in data]
         self.e_vectors = [item['best_vectors'][0] for item in data]
         self.m_vectors = [item['best_vectors'][1] for item in data]
+    
+    def __len__(self):
+        return len(self.texts)
+    
+    def __getitem__(self, idx):
+        return self.texts[idx], self.instructions[idx], self.categories[idx]
 
 # Для датасета yahma/alpaca-cleaned, для задачи end2end    
 class AlpacaDatasetEnd2End():
@@ -64,6 +70,12 @@ class AlpacaDatasetEnd2End():
         self.instructions = [item['instruction'] for item in data]
         self.e_vectors = [item['best_vectors'][0] for item in data]
         self.m_vectors = [item['best_vectors'][1] for item in data]
+
+    def __len__(self):
+        return len(self.texts)
+    
+    def __getitem__(self, idx):
+        return self.texts[idx], self.instructions[idx]
 
 # Для зашумленных векторов
 class NoiseDataset(Dataset):

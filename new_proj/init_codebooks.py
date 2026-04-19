@@ -24,11 +24,11 @@ class CodeBooksInit:
         # Инициализируем e кодовые книги
         kmeans_e = KMeans(n_clusters=self.code_books, random_state=self.seed)
         kmeans_e.fit(e_vectors)
-        self.e_code_books = torch.tensor(kmeans_e.cluster_centers_)
+        self.e_code_books = torch.tensor(kmeans_e.cluster_centers_, dtype=self.dtype)
 
         # Инициализируем m кодовые книги
         k_means_m = KMeans(n_clusters=self.code_books, random_state=self.seed)
         k_means_m.fit(m_vectors)
-        self.m_code_books = torch.tensor(k_means_m.cluster_centers_)
+        self.m_code_books = torch.tensor(k_means_m.cluster_centers_, dtype=self.dtype)
 
         return self.e_code_books, self.m_code_books
