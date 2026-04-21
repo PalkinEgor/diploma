@@ -5,12 +5,12 @@ from datasets import load_from_disk
 
 # Для датасета yahma/alpaca-cleaned, для задачи векторизации
 class AlpacaDataset(Dataset):
-    def __init__(self, path):
+    def __init__(self, path, max_samples):
         raw_dataset = load_from_disk(path)
         dataset = raw_dataset.filter(lambda x: x['input'] == '' or x['input'] == 'None')
         dataset = dataset['train'].to_pandas()
-        self.texts = dataset['output'].to_list()
-        self.instructions = dataset['instruction'].to_list()
+        self.texts = dataset['output'].to_list()[:max_samples]
+        self.instructions = dataset['instruction'].to_list()[:max_samples]
     
     def __len__(self):
         return len(self.texts)
@@ -20,12 +20,12 @@ class AlpacaDataset(Dataset):
 
 # Для датасета databricks/databricks-dolly-15k, для задачи векторизации
 class DollyDataset(Dataset):
-    def __init__(self, path):
+    def __init__(self, path, max_samples):
         raw_dataset = load_from_disk(path)
         dataset = raw_dataset['train'].to_pandas()
-        self.texts = dataset['response'].to_list()
-        self.instructions = dataset['instruction'].to_list()
-        self.categories = dataset['category'].to_list()
+        self.texts = dataset['response'].to_list()[:max_samples]
+        self.instructions = dataset['instruction'].to_list()[:max_samples]
+        self.categories = dataset['category'].to_list()[:max_samples]
 
     def __len__(self):
         return len(self.texts)
@@ -57,7 +57,7 @@ class DollyDatasetEnd2End(Dataset):
         return self.texts[idx], self.instructions[idx], self.categories[idx]
 
 # Для датасета yahma/alpaca-cleaned, для задачи end2end    
-class AlpacaDatasetEnd2End():
+class AlpacaDatasetEnd2End(Dataset):
     def __init__(self, path, threshold=0.9):
         with open(path, 'r', encoding='utf-8') as f:
             dataset = json.load(f)
@@ -95,11 +95,11 @@ class NoiseDataset(Dataset):
         return self.texts[idx], self.e_vectors[idx], self.v_vectors[idx]
     
 # Фабрика для выбора датасета
-def get_dataset(dataset_type, path):
+def get_dataset(dataset_type, path, max_samples):
     if dataset_type == 'alpaca':
-        return AlpacaDataset(path)
+        return AlpacaDataset(path, max_samples)
     elif dataset_type == 'dolly':
-        return DollyDataset(path)
+        return DollyDataset(path, max_samples)
     elif dataset_type == 'noise':
         return NoiseDataset(path)
     else:

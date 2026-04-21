@@ -51,10 +51,8 @@ def load_model(config):
     return model
 
 def build_dataloader(config, tokenizer):
-    raw_dataset = load_from_disk(config['dataset']['path'])
-    dataset = get_dataset(config['dataset']['type'], raw_dataset)
-
-    collator = get_collator(config['dataset']['type'], tokenizer, config['training']['max_tokens'])
+    dataset = get_dataset(config['dataset']['type'], config['dataset']['path'], config['dataset']['max_samples'])
+    collator = get_collator(config['dataset']['type'], config['task_type'], tokenizer, config['training']['max_tokens'])
     dataloader = DataLoader(
         dataset, 
         batch_size=config['training']['batch_size'],
