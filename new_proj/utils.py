@@ -1,11 +1,22 @@
 import torch
 import yaml
+from huggingface_hub import snapshot_download
 
 
 # Загружаем конфиг эксперимента
 def load_config(path):
     with open(path, 'r') as f:
         return yaml.safe_load(f)
+
+# Скачиваем модель локально    
+def load_model(path, dir_name, token):
+    snapshot_download(
+        repo_id=path,
+        local_dir=dir_name,
+        local_dir_use_symlinks=False,
+        resume_download=True,
+        token=token
+    )
 
 # Создание схемы с одним e вектором и text_length - 1 m векторов
 def generate_input(vectors, lengths, max_len, pad_embed, device):

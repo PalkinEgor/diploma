@@ -1,0 +1,22 @@
+model:
+  path: /userspace/pes/diploma_materials/models/gemma-3-1b-it
+  dtype: bfloat16
+
+dataset:
+  path: /userspace/pes/diploma_materials/datasets/dolly_dataset
+  type: dolly
+  max_samples: 2000
+
+task_type: nar
+
+training:
+  batch_size: 1
+  maxiter: 2000
+  max_tokens: 256
+  threshold: 0.99
+  seed: 42
+
+logging:
+  save_every: 10
+  save_log_path: /userspace/pes/diploma/logs/dolly_gemma_nar_exp
+  save_path: /userspace/pes/diploma/results/dolly_gemma_nar_exp.json

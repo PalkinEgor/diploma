@@ -145,7 +145,7 @@ def get_collator(dataset_type, task_type, tokenizer, max_tokens):
             return lambda batch: collate_dolly_end2end(batch, tokenizer, max_tokens)
         else:
             raise ValueError(f'Unknown dataset: {dataset_type}')
-    elif task_type == 'reconstruction':
+    elif task_type == 'nar':
         if dataset_type == 'alpaca':
             return lambda batch: collate_alpaca(batch, tokenizer, max_tokens)
         elif dataset_type == 'dolly':
