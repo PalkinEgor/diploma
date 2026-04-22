@@ -3,7 +3,6 @@ import torch
 import random
 import json
 import logging
-from datasets import load_from_disk
 from dataset import get_dataset
 from collator import get_collator
 from utils import load_config
@@ -51,7 +50,7 @@ def load_model(config):
     return model
 
 def build_dataloader(config, tokenizer):
-    dataset = get_dataset(config['dataset']['type'], config['dataset']['path'], config['dataset']['max_samples'])
+    dataset = get_dataset(config['dataset']['type'], config['task_type'], config['dataset']['path'], config['dataset']['max_samples'])
     collator = get_collator(config['dataset']['type'], config['task_type'], tokenizer, config['training']['max_tokens'])
     dataloader = DataLoader(
         dataset, 

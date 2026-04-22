@@ -95,12 +95,22 @@ class NoiseDataset(Dataset):
         return self.texts[idx], self.e_vectors[idx], self.v_vectors[idx]
     
 # Фабрика для выбора датасета
-def get_dataset(dataset_type, path, max_samples):
-    if dataset_type == 'alpaca':
-        return AlpacaDataset(path, max_samples)
-    elif dataset_type == 'dolly':
-        return DollyDataset(path, max_samples)
-    elif dataset_type == 'noise':
-        return NoiseDataset(path)
+def get_dataset(dataset_type, task_type, path, max_samples):
+    if task_type == 'nar':
+        if dataset_type == 'alpaca':
+            return AlpacaDataset(path, max_samples)
+        elif dataset_type == 'dolly':
+            return DollyDataset(path, max_samples)
+        elif dataset_type == 'noise':
+            return NoiseDataset(path)
+        else:
+            raise ValueError(f'Unknown dataset: {dataset_type}')
+    elif task_type == 'end2end':
+        if dataset_type == 'alpaca':
+            return AlpacaDatasetEnd2End(path)
+        elif dataset_type == 'dolly':
+            return DollyDatasetEnd2End(path)
+        else:
+            raise ValueError(f'Unknown dataset: {dataset_type}')
     else:
-        raise ValueError(f'Unknown dataset: {dataset_type}')
+        raise ValueError(f'Unknown task type: {dataset_type}')

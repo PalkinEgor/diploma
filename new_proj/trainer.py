@@ -84,12 +84,11 @@ class NARfit:
 
 # Для моедели на основе кодовых книг    
 class CodeBookFit:
-    def __init__(self, full_model, optimizer, tokenizer, device, hyperparams):
+    def __init__(self, full_model, optimizer, tokenizer, device):
         self.full_model = full_model
         self.optimizer = optimizer
         self.tokenizer = tokenizer
         self.device = device
-        self.hyperparams = hyperparams
     
     def train_batch(self, batch):
         self.full_model.train()
