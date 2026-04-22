@@ -17,5 +17,5 @@ training:
 
 logging:
   save_every: 10
-  save_log_path: /userspace/pes/diploma/logs/dolly_llama_codebook_exp
+  save_log_path: /userspace/pes/diploma/logs/dolly_llama_codebook_exp.log
   save_path: /userspace/pes/diploma/results/dolly_llama_codebook_exp.json

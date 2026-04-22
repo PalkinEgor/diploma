@@ -18,5 +18,5 @@ training:
 
 logging:
   save_every: 10
-  save_log_path: /userspace/pes/diploma/logs/dolly_qwen_nar_exp
+  save_log_path: /userspace/pes/diploma/logs/dolly_qwen_nar_exp.log
   save_path: /userspace/pes/diploma/results/dolly_qwen_nar_exp.json
