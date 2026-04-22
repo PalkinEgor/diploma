@@ -95,7 +95,7 @@ class NoiseDataset(Dataset):
         return self.texts[idx], self.e_vectors[idx], self.v_vectors[idx]
     
 # Фабрика для выбора датасета
-def get_dataset(dataset_type, task_type, path, max_samples):
+def get_dataset(dataset_type, task_type, path, max_samples=None):
     if task_type == 'nar':
         if dataset_type == 'alpaca':
             return AlpacaDataset(path, max_samples)

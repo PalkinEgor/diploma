@@ -40,7 +40,7 @@ def setup_logger(path):
     return logger
 
 def init_codebooks(config):
-    dataset = get_dataset(config['dataset']['type'], config['task_type'], config['dataset']['path'], config['dataset']['max_samples'])
+    dataset = get_dataset(config['dataset']['type'], config['task_type'], config['dataset']['path'])
     code_book_init = CodeBooksInit(
         dataset, 
         config['training']['code_books_count'], 
@@ -52,7 +52,7 @@ def init_codebooks(config):
     return code_book_init
 
 def build_dataloader(config, tokenizer):
-    dataset = get_dataset(config['dataset']['type'], config['task_type'], config['dataset']['path'], config['dataset']['max_samples'])
+    dataset = get_dataset(config['dataset']['type'], config['task_type'], config['dataset']['path'])
     collator = get_collator(config['dataset']['type'], config['task_type'], tokenizer, config['training']['max_tokens'])
     dataloader = DataLoader(
         dataset,
