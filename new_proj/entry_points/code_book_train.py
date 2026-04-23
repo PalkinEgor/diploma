@@ -2,6 +2,7 @@ import argparse
 import torch
 import random
 import logging
+from tqdm import tqdm
 from init_codebooks import CodeBooksInit
 from dataset import get_dataset
 from collator import get_collator
@@ -22,6 +23,8 @@ DTYPE_MAP = {
     'float16': torch.float16,
     'bfloat16': torch.bfloat16
 }
+
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def fix_seeds(seed):
     torch.manual_seed(seed)
@@ -70,12 +73,14 @@ def load_model(config, code_book_init, tokenizer):
         code_book_init.m_code_books,
         DTYPE_MAP[config['model']['dtype']]
     )
+    encoder_model = encoder_model.to(DEVICE)
     full_model = FullCodeBooksModel(
         encoder_model, 
         config['model']['path'],
         tokenizer,
         DTYPE_MAP[config['model']['dtype']]
     )
+    full_model = full_model.to(DEVICE)
     return full_model
 
 if __name__ == '__main__':
@@ -111,7 +116,7 @@ if __name__ == '__main__':
         epoch_accuracy = []
         epoch_loss = 0
         logger.info(f'Start {epoch + 1} epoch')
-        for idx, batch in enumerate(dataloader):
+        for idx, batch in tqdm(enumerate(dataloader)):
             loss, accuracy = codebooks_trainer.train_batch(batch)
             epoch_accuracy.extend(accuracy)
             epoch_loss += loss

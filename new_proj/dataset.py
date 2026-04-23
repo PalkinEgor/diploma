@@ -39,9 +39,9 @@ class DollyDatasetEnd2End(Dataset):
         with open(path, 'r', encoding='utf-8') as f:
             dataset = json.load(f)
 
-        data = [{'text': item['text'], 
-                 'instruction': item['instruction'], 
-                 'category': item['category'], 
+        data = [{'text': item['texts'], 
+                 'instruction': item['instructions'], 
+                 'category': item['categories'], 
                  'best_vectors': item['best_vectors']} 
                  for item in dataset if item['accuracy'] >= threshold]
         self.texts = [item['text'] for item in data]
@@ -62,8 +62,8 @@ class AlpacaDatasetEnd2End(Dataset):
         with open(path, 'r', encoding='utf-8') as f:
             dataset = json.load(f)
 
-        data = [{'text': item['text'], 
-                 'instruction': item['instruction'], 
+        data = [{'text': item['texts'], 
+                 'instruction': item['instructions'], 
                  'best_vectors': item['best_vectors']} 
                  for item in dataset if item['accuracy'] >= threshold]
         self.texts = [item['text'] for item in data]

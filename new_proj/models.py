@@ -10,9 +10,9 @@ class EncoderCodeBooksModel(nn.Module):
     def __init__(self, encoder_name, e_code_books, m_code_books, dtype):
         super().__init__()
 
-        self.encoder = AutoModel.from_pretrained(encoder_name, torch_dtype=dtype, device_map='auto')
-        self.e_classifier = nn.Linear(self.encoder.config.hidden_size, e_code_books.shape[0])
-        self.m_classifier = nn.Linear(self.encoder.config.hidden_size, m_code_books.shape[0])
+        self.encoder = AutoModel.from_pretrained(encoder_name, torch_dtype=dtype)
+        self.e_classifier = nn.Linear(self.encoder.config.hidden_size, e_code_books.shape[0]).to(dtype)
+        self.m_classifier = nn.Linear(self.encoder.config.hidden_size, m_code_books.shape[0]).to(dtype)
         self.e_code_books = torch.nn.Parameter(e_code_books.to(dtype=dtype))
         self.m_code_books = torch.nn.Parameter(m_code_books.to(dtype=dtype))
         self.dtype = dtype
@@ -38,7 +38,7 @@ class FullCodeBooksModel(nn.Module):
         super().__init__()
 
         self.encoder_model = encoder_model
-        self.decoder = AutoModelForCausalLM.from_pretrained(decoder_name, torch_dtype=dtype, device_map='auto')
+        self.decoder = AutoModelForCausalLM.from_pretrained(decoder_name, torch_dtype=dtype)
         for param in self.decoder.parameters():
             param.requires_grad = False
         self.decoder.eval()
