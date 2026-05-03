@@ -13,6 +13,7 @@ training:
   max_tokens: 256
   n_epochs: 20
   seed: 42
+  diversity_loss_weight: 0.1
   code_books:
     G: 2
     V: 32

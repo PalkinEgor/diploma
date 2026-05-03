@@ -84,11 +84,13 @@ class NARfit:
 
 # Для моедели на основе кодовых книг    
 class CodeBookFit:
-    def __init__(self, full_model, optimizer, tokenizer, device):
+    def __init__(self, full_model, optimizer, tokenizer, device, m_token, diversity_loss_weight):
         self.full_model = full_model
         self.optimizer = optimizer
         self.tokenizer = tokenizer
         self.device = device
+        self.m_token = m_token
+        self.diversity_loss_weight = diversity_loss_weight
     
     def train_batch(self, batch):
         self.full_model.train()
@@ -105,20 +107,32 @@ class CodeBookFit:
         B = tokenized_instruction.shape[0]
 
         # Получаем логиты
-        logits = self.full_model(
-            tokenized_instruction,
-            tokenized_answers,
-            instruction_attention_mask,
-            answer_attention_mask,
-            answer_lengths
-        )
+        if self.m_token:
+            logits, e_diversity_loss, m_diversity_loss = self.full_model(
+                tokenized_instruction,
+                tokenized_answers,
+                instruction_attention_mask,
+                answer_attention_mask,
+                answer_lengths
+            )
+            diversity_loss = e_diversity_loss + m_diversity_loss
+        else:
+            logits, e_diversity_loss = self.full_model(
+                tokenized_instruction,
+                tokenized_answers,
+                instruction_attention_mask,
+                answer_attention_mask,
+                answer_lengths
+            )
+            diversity_loss = e_diversity_loss
 
         # Считаем лосс
-        loss = torch.nn.functional.cross_entropy(
+        ce_loss = torch.nn.functional.cross_entropy(
             logits.reshape(-1, logits.size(-1)), 
             labels.view(-1), 
             ignore_index=self.tokenizer.pad_token_id
         )
+        loss = ce_loss + self.diversity_loss_weight * diversity_loss
         pred = logits.argmax(dim=-1)
 
         # Считаем метрики
@@ -132,7 +146,7 @@ class CodeBookFit:
         loss.backward()
         self.optimizer.step()
 
-        return loss.item(), accuracies
+        return loss.item(), ce_loss.item(), diversity_loss.item(), accuracies
     
     def run_batch(self, batch):
         self.full_model.eval()
@@ -148,20 +162,32 @@ class CodeBookFit:
         B = tokenized_instruction.shape[0]
 
         with torch.no_grad():
-            logits = self.full_model(
-                tokenized_instruction,
-                tokenized_answers,
-                instruction_attention_mask,
-                answer_attention_mask,
-                answer_lengths
-            )
+            if self.m_token:
+                logits, e_diversity_loss, m_diversity_loss = self.full_model(
+                    tokenized_instruction,
+                    tokenized_answers,
+                    instruction_attention_mask,
+                    answer_attention_mask,
+                    answer_lengths
+                )
+                diversity_loss = e_diversity_loss + m_diversity_loss
+            else:
+                logits, e_diversity_loss = self.full_model(
+                    tokenized_instruction,
+                    tokenized_answers,
+                    instruction_attention_mask,
+                    answer_attention_mask,
+                    answer_lengths
+                )
+                diversity_loss = e_diversity_loss
 
             # Считаем лосс
-            loss = torch.nn.functional.cross_entropy(
+            ce_loss = torch.nn.functional.cross_entropy(
                 logits.reshape(-1, logits.size(-1)),
                 labels.view(-1),
                 ignore_index=self.tokenizer.pad_token_id
             )
+            loss = ce_loss + self.diversity_loss_weight * diversity_loss
             pred = logits.argmax(dim=-1)
 
         # Считаем метрики
@@ -172,7 +198,7 @@ class CodeBookFit:
             accuracy = Metrics.calculate_accuracy(current_labels, current_pred)
             accuracies.append(accuracy)
 
-        return loss.item(), accuracies
+        return loss.item(), ce_loss.item(), diversity_loss.item(), accuracies
 
 # Класс для зашумленных векторов    
 class NoiseExp:

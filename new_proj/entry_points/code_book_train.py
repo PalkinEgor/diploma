@@ -46,7 +46,7 @@ def init_codebooks(config):
     dataset = get_dataset(config['dataset']['type'], config['task_type'], config['dataset']['path'])
     code_book_init = CodeBooksInit(
         dataset, 
-        config['training']['code_books_count'], 
+        config['training']['code_books']['V'], 
         config['training']['seed'],
         DTYPE_MAP[config['model']['dtype']],
         False      
@@ -113,17 +113,39 @@ if __name__ == '__main__':
     )
     device = next(model.parameters()).device
 
-    codebooks_trainer = CodeBookFit(model, optimizer, tokenizer, device)
+    codebooks_trainer = CodeBookFit(model, optimizer, tokenizer, device, config['training']['code_books']['m_vector'], config['training']['diversity_loss_weight'])
     n_epochs = config['training']['n_epochs']
 
     logger.info('start training')
     for epoch in range(n_epochs):
         epoch_accuracy = []
         epoch_loss = 0
+        epoch_ce_loss = 0
+        epoch_diversity_loss = 0
         logger.info(f'Start {epoch + 1} epoch')
         for idx, batch in tqdm(enumerate(dataloader)):
-            loss, accuracy = codebooks_trainer.train_batch(batch)
+            loss, ce_loss, diversity_loss, accuracy = codebooks_trainer.train_batch(batch)
             epoch_accuracy.extend(accuracy)
             epoch_loss += loss
-        logger.info(f'Epoch: {epoch + 1}; Loss: {epoch_loss / len(dataloader)}; Accuracy: {sum(epoch_accuracy) / len(epoch_accuracy)}')
+            epoch_ce_loss += ce_loss
+            epoch_diversity_loss += diversity_loss
+
+            logger.info(
+                "Epoch: %d; Batch: %d; Loss: %.4f; CE_Loss: %.4f; Diversity_Loss: %.4f; Accuracy: %.4f",
+                epoch + 1,
+                idx,
+                loss,
+                ce_loss,
+                diversity_loss,
+                sum(accuracy) / len(accuracy),
+            )
+
+        logger.info(
+            "Epoch: %d; Loss: %.4f; CE_Loss: %.4f; Diversity_Loss: %.4f; Accuracy: %.4f",
+            epoch + 1,
+            epoch_loss / len(dataloader),
+            epoch_ce_loss / len(dataloader),
+            epoch_diversity_loss / len(dataloader),
+            sum(epoch_accuracy) / len(epoch_accuracy),
+        )
     logger.info('finish training')        

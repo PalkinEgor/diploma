@@ -16,14 +16,14 @@ class GumbelVectorQuantizer(nn.Module):
         self.V = V
         self.code_dim = dim // G
         self.tau = tau
-        self.proj = nn.Linear(dim, G * V)
+        self.proj = nn.Linear(dim, G * V, dtype=dtype)
 
         centroids = code_books_init
         centroids = code_books_init.reshape(V, G, dim // G) # (V, G, d/G)
         centroids = centroids.permute(1, 0, 2) # (G, V, d/G)
         self.code_books = nn.Parameter(centroids.to(dtype=dtype))
 
-        self.out_proj = nn.Linear(G * self.code_dim, dim)
+        self.out_proj = nn.Linear(G * self.code_dim, dim, dtype=dtype)
 
     def forward(self, x):
         B, _ = x.shape
@@ -55,7 +55,7 @@ class EncoderCodeBooksModel(nn.Module):
         if m_vector:
             self.m_quantizer = GumbelVectorQuantizer(dim, G, V, m_code_books_init, dtype, tau)
         else:
-            self.m_proj = nn.Linear(dim, dim)
+            self.m_proj = nn.Linear(dim, dim, dtype=dtype)
 
     def forward(self, input_ids, attention_mask=None):
         x = self.encoder(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state[:, -1, :]
