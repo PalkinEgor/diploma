@@ -9,11 +9,15 @@ dataset:
 task_type: end2end
 
 training:
-  batch_size: 1
+  batch_size: 6
   max_tokens: 256
-  code_books_count: 32
-  n_epochs: 40
+  n_epochs: 20
   seed: 42
+  code_books:
+    G: 2
+    V: 32
+    tau: 1.0
+    m_vector: False
 
 logging:
   save_every: 10

@@ -69,16 +69,21 @@ def build_dataloader(config, tokenizer):
 def load_model(config, code_book_init, tokenizer):
     encoder_model = EncoderCodeBooksModel(
         config['model']['path'],
+        config['training']['code_books']['G'],
+        config['training']['code_books']['V'],
         code_book_init.e_code_books,
         code_book_init.m_code_books,
-        DTYPE_MAP[config['model']['dtype']]
+        config['training']['code_books']['tau'],
+        DTYPE_MAP[config['model']['dtype']],
+        config['training']['code_books']['m_vector']
     )
     encoder_model = encoder_model.to(DEVICE)
     full_model = FullCodeBooksModel(
         encoder_model, 
         config['model']['path'],
         tokenizer,
-        DTYPE_MAP[config['model']['dtype']]
+        DTYPE_MAP[config['model']['dtype']],
+        config['training']['code_books']['m_vector']
     )
     full_model = full_model.to(DEVICE)
     return full_model
@@ -121,6 +126,4 @@ if __name__ == '__main__':
             epoch_accuracy.extend(accuracy)
             epoch_loss += loss
         logger.info(f'Epoch: {epoch + 1}; Loss: {epoch_loss / len(dataloader)}; Accuracy: {sum(epoch_accuracy) / len(epoch_accuracy)}')
-    logger.info('finish training')
-        
-        
+    logger.info('finish training')        
