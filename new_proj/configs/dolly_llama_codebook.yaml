@@ -3,7 +3,7 @@ model:
   dtype: bfloat16
 
 dataset:
-  path: /userspace/pes/diploma_materials/datasets/dolly_dataset
+  path: /userspace/pes/diploma/results/dolly_llama_nar_exp1.json
   type: dolly
 
 task_type: end2end
@@ -11,11 +11,11 @@ task_type: end2end
 training:
   batch_size: 1
   max_tokens: 256
-  code_books_count: 100
-  n_epochs: 20
+  code_books_count: 32
+  n_epochs: 40
   seed: 42
 
 logging:
   save_every: 10
   save_log_path: /userspace/pes/diploma/logs/dolly_llama_codebook_exp.log
-  save_path: /userspace/pes/diploma/results/dolly_llama_codebook_exp.json
+  save_path: /userspace/pes/diploma/results/dolly_llama_codebook_exp.log

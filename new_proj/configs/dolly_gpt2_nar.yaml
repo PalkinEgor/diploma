@@ -1,5 +1,5 @@
 model:
-  path: /userspace/pes/diploma_materials/models/Qwen3-1.7B
+  path: /userspace/pes/diploma_materials/models/gpt2
   dtype: bfloat16
 
 dataset:
@@ -18,5 +18,5 @@ training:
 
 logging:
   save_every: 10
-  save_log_path: /userspace/pes/diploma/logs/dolly_qwen_nar_exp.log
-  save_path: /userspace/pes/diploma/results/dolly_qwen_nar_exp.json
+  save_log_path: /userspace/pes/diploma/logs/dolly_gpt2_nar_exp.log
+  save_path: /userspace/pes/diploma/results/dolly_gpt2_nar_exp.json
