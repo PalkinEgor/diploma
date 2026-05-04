@@ -9,14 +9,22 @@ def load_config(path):
         return yaml.safe_load(f)
 
 # Скачиваем модель локально    
-def load_model(path, dir_name, token):
-    snapshot_download(
-        repo_id=path,
-        local_dir=dir_name,
-        local_dir_use_symlinks=False,
-        resume_download=True,
-        token=token
-    )
+def load_model(path, dir_name, token=None):
+    if token:
+        snapshot_download(
+            repo_id=path,
+            local_dir=dir_name,
+            local_dir_use_symlinks=False,
+            resume_download=True,
+            token=token
+        )
+    else:
+        snapshot_download(
+            repo_id=path,
+            local_dir=dir_name,
+            local_dir_use_symlinks=False,
+            resume_download=True
+        )
 
 # Создание схемы с одним e вектором и text_length - 1 m векторов
 def generate_input(vectors, lengths, max_len, pad_embed, device):
