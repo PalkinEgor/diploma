@@ -130,16 +130,6 @@ if __name__ == '__main__':
             epoch_ce_loss += ce_loss
             epoch_diversity_loss += diversity_loss
 
-            logger.info(
-                "Epoch: %d; Batch: %d; Loss: %.4f; CE_Loss: %.4f; Diversity_Loss: %.4f; Accuracy: %.4f",
-                epoch + 1,
-                idx,
-                loss,
-                ce_loss,
-                diversity_loss,
-                sum(accuracy) / len(accuracy),
-            )
-
         logger.info(
             "Epoch: %d; Loss: %.4f; CE_Loss: %.4f; Diversity_Loss: %.4f; Accuracy: %.4f",
             epoch + 1,
