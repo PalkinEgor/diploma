@@ -14,7 +14,7 @@ training:
   n_epochs: 20
   seed: 42
   diversity_loss_weight: 0.1
-  mean_pooling: False
+  mean_pooling: True
   code_books:
     G: 2
     V: 32

@@ -45,20 +45,29 @@ class GumbelVectorQuantizer(nn.Module):
 
 # Энкодер модели с использованием кодовых книг
 class EncoderCodeBooksModel(nn.Module):
-    def __init__(self, encoder_name, G, V, e_code_books_init, m_code_books_init, tau, dtype, m_vector):
+    def __init__(self, encoder_name, G, V, e_code_books_init, m_code_books_init, tau, dtype, m_vector, mean_pooling):
         super().__init__()
 
         self.encoder = AutoModel.from_pretrained(encoder_name, torch_dtype=dtype)
         dim = self.encoder.config.hidden_size
         self.e_quantizer = GumbelVectorQuantizer(dim, G, V, e_code_books_init, dtype, tau)
         self.m_vector = m_vector
+        self.mean_pooling = mean_pooling
         if m_vector:
             self.m_quantizer = GumbelVectorQuantizer(dim, G, V, m_code_books_init, dtype, tau)
         else:
             self.m_proj = nn.Linear(dim, dim, dtype=dtype)
 
     def forward(self, input_ids, attention_mask=None):
-        x = self.encoder(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state[:, -1, :]
+        hidden = self.encoder(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state
+        if self.mean_pooling:
+            mask = attention_mask.unsqueeze(-1).to(hidden.dtype)
+            x = (hidden * mask).sum(dim=1)
+            x = x / mask.sum(dim=1).clamp(min=1e-6)
+        else:
+            lengths = attention_mask.sum(dim=1) - 1
+            x = hidden[torch.arange(hidden.size(0), device=hidden.device), lengths]
+
         e_code_book, e_diversity_loss = self.e_quantizer(x)
         if self.m_vector:
             m_code_book, m_diversity_loss = self.m_quantizer(x)
@@ -74,16 +83,20 @@ class FullCodeBooksModel(nn.Module):
         super().__init__()
 
         self.encoder_model = encoder_model
-        self.decoder = AutoModelForCausalLM.from_pretrained(decoder_name, torch_dtype=dtype)
-        for param in self.decoder.parameters():
-            param.requires_grad = False
-        self.decoder.eval()
+        self.decoder = AutoModelForCausalLM.from_pretrained(decoder_name, torch_dtype=dtype)        
 
         self.pad_token_id = tokenizer.pad_token_id
         self.decoder_pad_emb = self.decoder.get_input_embeddings().weight[self.pad_token_id]
 
         self.dtype = dtype
         self.m_vector = m_vector
+
+    def train(self, mode=True):
+        super().train(mode)
+        for param in self.decoder.parameters():
+            param.requires_grad = False
+        self.decoder.eval()
+        return self
 
     def forward(self, tokenized_instruction, tokenized_answers, instruction_attention_mask, answer_attention_mask, answer_lengths):
         if self.m_vector:

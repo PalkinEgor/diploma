@@ -75,7 +75,8 @@ def load_model(config, code_book_init, tokenizer):
         code_book_init.m_code_books,
         config['training']['code_books']['tau'],
         DTYPE_MAP[config['model']['dtype']],
-        config['training']['code_books']['m_vector']
+        config['training']['code_books']['m_vector'],
+        config['training']['mean_pooling']
     )
     encoder_model = encoder_model.to(DEVICE)
     full_model = FullCodeBooksModel(
