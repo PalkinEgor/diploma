@@ -1,0 +1,17 @@
+# Генерация синтаксических предложений генеративной LLM.
+experiment:
+  type: syntax_llm
+
+model:
+  path: /userspace/pes/diploma_materials/Qwen3-4B
+
+training:
+  sample_size: 30
+  iterations: 1
+  generation:
+    max_new_tokens: 1024
+    temperature: 0.7
+    top_p: 0.9
+
+logging:
+  save_path: /userspace/pes/diploma/data/syntax_llm.json

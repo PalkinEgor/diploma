@@ -1,0 +1,19 @@
+# Подсчёт teacher-эмбеддингов моделью-эмбеддером.
+experiment:
+  type: teacher_embeddings
+
+model:
+  path: /userspace/pes/diploma_materials/models/qwen3_embedder_4b
+  dtype: bfloat16
+
+dataset:
+  path: /userspace/pes/diploma/results/dolly_llama_protofit.json
+  type: dolly
+
+training:
+  batch_size: 16
+  mode: instruction
+  normalize: true
+
+logging:
+  save_path: /userspace/pes/diploma/results/dolly_teacher_embeddings.json

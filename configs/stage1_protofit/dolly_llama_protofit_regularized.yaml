@@ -1,0 +1,35 @@
+experiment:
+  type: proto_fit
+
+model:
+  path: /userspace/pes/diploma_materials/models/Llama-3.2-1B-Instruct
+  dtype: bfloat16
+
+dataset:
+  path: /userspace/pes/diploma_materials/datasets/dolly_dataset
+  type: dolly
+  max_samples: 2000
+
+training:
+  batch_size: 8
+  maxiter: 2000
+  max_tokens: 256
+  threshold: 0.98
+  seed: 42
+
+teacher:
+  path: /userspace/pes/diploma_materials/models/qwen3_embedder_4b
+  dtype: bfloat16
+  normalize: true
+
+regularizers:
+  - name: cosine_anchor
+    weight: 0.1
+    seed: 42
+  - name: relation_distillation
+    weight: 0.1
+
+logging:
+  save_every: 10
+  save_log_path: /userspace/pes/diploma/logs/dolly_llama_protofit_reg.log
+  save_path: /userspace/pes/diploma/results/dolly_llama_protofit_reg.json

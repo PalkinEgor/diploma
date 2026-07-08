@@ -1,0 +1,16 @@
+# Генерация синтаксических предложений по контекстно-свободным грамматикам.
+experiment:
+  type: syntax_cfg
+
+training:
+  sample_size:
+    noun: 15
+    verb: 15
+    adj: 15
+    adv: 15
+  iterations: 30
+  sentence_number: 1
+  words_number: 500
+
+logging:
+  save_path: /userspace/pes/diploma/data/syntax_cfg.json
